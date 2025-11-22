@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import React, { useState, type ChangeEvent } from "react";
 import {
   Card,
   CardContent,
@@ -40,6 +40,7 @@ type Listing = {
   deadline?: string;
   images?: ListingImage[];
   seller: string;
+  poster_uid?: string;
   rating?: number;
   reviewsCount?: number;
 };
@@ -66,6 +67,7 @@ function mapApiListing(item: any): Listing {
         }))
       : undefined,
     seller: "Creator",
+    poster_uid: item.poster_uid ?? item.posterUid ?? item.poster ?? undefined,
     rating:
       typeof item.poster_rating === "number" ? item.poster_rating : undefined,
     reviewsCount: undefined,
@@ -96,6 +98,82 @@ export function CreateListingSection({
       ? initialListings.map((item) => mapApiListing(item))
       : [],
   );
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // Fetch display names for poster_uids and populate seller + myListings
+  React.useEffect(() => {
+    let mounted = true;
+    const supabase = createClient();
+
+    async function enrichListings() {
+      // get current user id
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        const currentUid = user?.id ?? null;
+        if (!mounted) return;
+        setUserId(currentUid ?? null);
+
+        // collect unique poster_uids
+        const listings = marketListings.slice();
+        const uids = Array.from(
+          new Set(listings.map((l) => l.poster_uid).filter(Boolean)),
+        ) as string[];
+
+        if (uids.length === 0) return;
+
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+        // fetch profiles in parallel
+        const profilePromises = uids.map((uid) =>
+          fetch(`${baseUrl}/api/v1/users/${encodeURIComponent(uid)}`).then(async (r) => {
+            if (!r.ok) return null;
+            try {
+              return await r.json();
+            } catch {
+              return null;
+            }
+          }),
+        );
+
+        const profiles = await Promise.all(profilePromises);
+        if (!mounted) return;
+
+        const nameByUid: Record<string, string> = {};
+        profiles.forEach((p) => {
+          if (!p) return;
+          const uid = p.uid ?? p.id ?? null;
+          if (!uid) return;
+          // prefer a display field if present, fall back to phone or short uid
+          const display = p.display_name ?? p.full_name ?? p.phone ?? String(uid).slice(0, 8);
+          nameByUid[String(uid)] = display;
+        });
+
+        // update market listings
+        const updatedMarket = listings.map((l) => ({
+          ...l,
+          seller: l.poster_uid && nameByUid[l.poster_uid] ? nameByUid[l.poster_uid] : l.seller,
+        }));
+
+        // also populate myListings for listings posted by current user
+        const mine = updatedMarket.filter((l) => currentUid && l.poster_uid === currentUid) as Listing[];
+
+        setMarketListings(updatedMarket);
+        if (mine.length > 0) setMyListings((prev) => [...mine, ...prev]);
+      } catch (err) {
+        // ignore enrichment errors
+        console.error("Failed to enrich listings with user profiles", err);
+      }
+    }
+
+    enrichListings();
+
+    return () => {
+      mounted = false;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [activeTab, setActiveTab] = useState<"marketplace" | "mine">(
     "marketplace",
   );
@@ -234,6 +312,7 @@ export function CreateListingSection({
           }))
           .filter((image) => image.url.length > 0),
         seller: "You",
+        poster_uid: user.id,
       };
 
       setMyListings((prev) => [newListing, ...prev]);
