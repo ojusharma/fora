@@ -1,0 +1,214 @@
+-- ---------- prerequisites ----------
+-- Enable uuid-ossp if you need uuid generation (Supabase provides gen_random_uuid())
+-- Enable PostGIS if you want geography/geometry types (recommended for geospatial queries)
+-- CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- CREATE EXTENSION IF NOT EXISTS postgis;
+
+-- ---------- enums ----------
+CREATE TYPE listing_status AS ENUM (
+  'open',
+  'in_progress',
+  'completed',
+  'cancelled'
+);
+
+CREATE TYPE applicant_status AS ENUM (
+  'applied',
+  'shortlisted',
+  'rejected',
+  'withdrawn'
+);
+
+CREATE TYPE user_role AS ENUM (
+  'user',
+  'moderator',
+  'admin'
+);
+
+CREATE TYPE rating_type AS ENUM (
+  'poster',    -- rating for the poster by assignee/applicant
+  'assignee'   -- rating for the assignee by poster
+);
+
+-- ---------- Tags ----------
+CREATE TABLE tags (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE
+);
+
+-- ---------- Profiles (user metadata; auth.users holds auth data) ----------
+-- Use auth.users(id) as canonical id (uuid). We create a profile table that holds app-specific user info.
+CREATE TABLE user_profiles (
+  uid UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  dob DATE,
+  phone TEXT,         -- optional
+  role user_role NOT NULL DEFAULT 'user',
+  credits INTEGER NOT NULL DEFAULT 0,
+  last_updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- location: prefer PostGIS geography point for accurate distance
+  location_geog geography(Point,4326),   -- requires PostGIS; nullable
+  latitude DOUBLE PRECISION,             -- simple fallback if PostGIS not used
+  longitude DOUBLE PRECISION,            -- simple fallback if PostGIS not used
+
+  -- preferences will be many-to-many via user_preferences (tags)
+  -- stats relation: point to user_stats (one-to-one)
+  CONSTRAINT email_format CHECK (email IS NULL OR position('@' in email) > 1)
+);
+
+-- Index for quick geo queries if using PostGIS:
+CREATE INDEX IF NOT EXISTS idx_user_profiles_location_geog ON user_profiles USING GIST (location_geog);
+
+-- ---------- Listings ----------
+CREATE TABLE listings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  description TEXT,
+  images JSONB,                            -- array of image URLs/objects: [{url, alt, width, height}, ...]
+  poster_uid UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  assignee_uid UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  status listing_status NOT NULL DEFAULT 'open',
+  location_geog geography(Point,4326),     -- requires PostGIS; nullable
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
+  deadline TIMESTAMPTZ,                    -- nullable
+  compensation NUMERIC(12,2),              -- currency amount; consider adding currency code if multi-currency
+  currency CHAR(3) DEFAULT 'USD',          -- ISO currency code; optional
+  last_posted TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  poster_rating_avg NUMERIC(3,2) DEFAULT NULL,
+  assignee_rating_avg NUMERIC(3,2) DEFAULT NULL,
+  CHECK (compensation >= 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_listings_status ON listings (status);
+CREATE INDEX IF NOT EXISTS idx_listings_deadline ON listings (deadline);
+CREATE INDEX IF NOT EXISTS idx_listings_poster ON listings (poster_uid);
+CREATE INDEX IF NOT EXISTS idx_listings_assignee ON listings (assignee_uid);
+CREATE INDEX IF NOT EXISTS idx_listings_location_geog ON listings USING GIST (location_geog);
+
+-- ---------- Listing tags (many-to-many) ----------
+CREATE TABLE listing_tags (
+  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (listing_id, tag_id)
+);
+
+-- ---------- Listing applicants (many-to-many, with metadata) ----------
+CREATE TABLE listing_applicants (
+  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  applicant_uid UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  status applicant_status NOT NULL DEFAULT 'applied',
+  message TEXT,      -- optional application message
+  UNIQUE (listing_id, applicant_uid)
+);
+
+CREATE INDEX IF NOT EXISTS idx_listing_applicants_applicant ON listing_applicants (applicant_uid);
+CREATE INDEX IF NOT EXISTS idx_listing_applicants_listing ON listing_applicants (listing_id);
+
+-- ---------- Ratings (keeps record of each rating, used to compute aggregates) ----------
+CREATE TABLE listing_ratings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  rater_uid UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,  -- who gave the rating
+  ratee_uid UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,  -- who received the rating
+  rating SMALLINT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  rating_type rating_type NOT NULL,
+  comment TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (listing_id, rater_uid, rating_type)  -- avoid duplicate ratings of same type per rater on same listing
+);
+
+CREATE INDEX IF NOT EXISTS idx_listing_ratings_listing ON listing_ratings (listing_id);
+CREATE INDEX IF NOT EXISTS idx_listing_ratings_ratee ON listing_ratings (ratee_uid);
+
+-- ---------- User preferences (tags) ----------
+CREATE TABLE user_preferences (
+  uid UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (uid, tag_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_preferences_uid ON user_preferences (uid);
+
+-- ---------- User stats (one-to-one, denormalized counters for fast reads) ----------
+CREATE TABLE user_stats (
+  uid UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  num_listings_posted INTEGER NOT NULL DEFAULT 0,
+  num_listings_applied INTEGER NOT NULL DEFAULT 0,
+  num_listings_assigned INTEGER NOT NULL DEFAULT 0,
+  num_listings_completed INTEGER NOT NULL DEFAULT 0,
+  avg_rating NUMERIC(3,2) DEFAULT NULL,   -- average across ratings received (if desired)
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_stats_num_posted ON user_stats (num_listings_posted);
+
+-- ---------- Optional: listing_reviews table (if you want text reviews separate from ratings) ----------
+-- (We already have `listing_ratings.comment`, so this is optional.)
+
+-- ---------- Triggers & Notes ----------
+-- You'll likely want triggers / background jobs to:
+--  - maintain user_stats counts when listings are created/updated and when applications happen
+--  - update listings.poster_rating_avg and listings.assignee_rating_avg when listing_ratings are inserted/updated/deleted
+--  - update user_profiles.last_updated and listings.updated_at on changes
+--  - optionally enforce business rules (e.g., cannot apply to your own listing)
+
+-- Example: simple function to refresh avg rating for a listing (call from trigger):
+CREATE OR REPLACE FUNCTION refresh_listing_rating_avgs(listing_uuid UUID) RETURNS VOID LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE listings
+  SET poster_rating_avg = sub.poster_avg,
+      assignee_rating_avg = sub.assignee_avg
+  FROM (
+    SELECT
+      COALESCE( AVG(rating) FILTER (WHERE rating_type = 'poster'), NULL) AS poster_avg,
+      COALESCE( AVG(rating) FILTER (WHERE rating_type = 'assignee'), NULL) AS assignee_avg
+    FROM listing_ratings
+    WHERE listing_id = listing_uuid
+  ) AS sub
+  WHERE listings.id = listing_uuid;
+END;
+$$;
+
+-- Example trigger to call the function after insert/update/delete on listing_ratings:
+CREATE OR REPLACE FUNCTION trg_listing_ratings_after_change() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM refresh_listing_rating_avgs(NEW.listing_id);
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_listing_ratings_after_insert
+AFTER INSERT ON listing_ratings
+FOR EACH ROW EXECUTE FUNCTION trg_listing_ratings_after_change();
+
+CREATE TRIGGER trg_listing_ratings_after_update
+AFTER UPDATE ON listing_ratings
+FOR EACH ROW EXECUTE FUNCTION trg_listing_ratings_after_change();
+
+CREATE TRIGGER trg_listing_ratings_after_delete
+AFTER DELETE ON listing_ratings
+FOR EACH ROW EXECUTE FUNCTION refresh_listing_rating_avgs(OLD.listing_id);
+
+-- Note: you may want to adapt above triggers to handle NULLs and performance.
+
+-- ---------- Example constraints / business rule helpers ----------
+-- Prevent poster from being an applicant (business rule; optional)
+CREATE OR REPLACE FUNCTION prevent_self_apply() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM listings WHERE id = NEW.listing_id AND poster_uid = NEW.applicant_uid) THEN
+    RAISE EXCEPTION 'Poster cannot apply to their own listing';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_prevent_self_apply
+BEFORE INSERT ON listing_applicants
+FOR EACH ROW EXECUTE FUNCTION prevent_self_apply();
+
