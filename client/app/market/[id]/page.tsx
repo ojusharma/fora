@@ -1,35 +1,75 @@
+"use client";
+
 import { AuthButton } from "@/components/auth-button";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { Suspense } from "react";
+import { notFound, redirect, useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
-export default async function Page({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
+type Listing = {
+  id: string;
+  name: string;
+  description: string;
+  images: string[];
+  compensation: number;
+  currency?: string;
+  deadline?: string;
+  location_address?: string;
+};
 
-  if (error || !data?.claims) {
-    redirect("/auth/login");
+export default function Page() {
+  const params = useParams();
+  const router = useRouter();
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function checkAuthAndFetch() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push("/auth/login");
+        return;
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+      const id = params.id as string;
+
+      try {
+        const res = await fetch(`${baseUrl}/api/v1/listings/${id}`, {
+          cache: "no-store",
+        });
+        
+        if (!res.ok) {
+          notFound();
+          return;
+        }
+
+        const data = await res.json();
+        setListing(data);
+      } catch (error) {
+        console.error("Failed to fetch listing:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    checkAuthAndFetch();
+  }, [params.id, router]);
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center">
+        <p>Loading...</p>
+      </main>
+    );
   }
 
-  const baseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-
-    const { id } = await params;
-
-  const res = await fetch(`${baseUrl}/api/v1/listings/${id}`, {
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    notFound();
+  if (!listing) {
+    return null;
   }
-
-  const listing = await res.json();
 
   const primaryImage =
     Array.isArray(listing.images) && listing.images.length > 0
@@ -44,19 +84,26 @@ export default async function Page({
             <div className="flex gap-5 items-center font-semibold">
               <Link href={"/"}>fora</Link>
               <Link href={"/market"}>marketplace</Link>
+              <Link href={"/map"}>map</Link>
             </div>
-            <Suspense>
-              <AuthButton />
-            </Suspense>
+            <AuthButton />
           </div>
         </nav>
         <div className="flex-1 flex flex-col gap-8 w-full max-w-3xl p-5">
-          <Link
-            href="/market"
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            ← Back to marketplace
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/map"
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              ← Back to map
+            </Link>
+            <Link
+              href="/market"
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              ← Back to marketplace
+            </Link>
+          </div>
 
           <article className="flex flex-col gap-6">
             {primaryImage && typeof primaryImage === "string" ? (
@@ -73,8 +120,7 @@ export default async function Page({
               <h1 className="text-2xl font-semibold">{listing.name}</h1>
               {typeof listing.compensation === "number" && (
                 <p className="text-sm font-medium">
-                  From {listing.currency ?? "USD"}{" "}
-                  {listing.compensation.toLocaleString()}
+                  ${listing.compensation.toLocaleString()}
                 </p>
               )}
               {listing.deadline && (
@@ -84,7 +130,7 @@ export default async function Page({
               )}
               {listing.location_address && (
                 <p className="text-xs text-muted-foreground">
-                  {listing.location_address}
+                  📍 {listing.location_address}
                 </p>
               )}
             </header>
