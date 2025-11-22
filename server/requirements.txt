@@ -1,2 +1,10 @@
+# FastAPI and server
 fastapi[standard]
 uvicorn[standard]
+
+# Supabase
+supabase
+
+# Environment and configuration
+python-dotenv
+pydantic-settings
