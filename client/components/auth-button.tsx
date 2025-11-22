@@ -13,7 +13,7 @@ export async function AuthButton() {
 
   return user ? (
     <div className="flex items-center gap-4">
-      Hey, {user.email}!
+      Hey, {user.user_metadata?.display_name}!
       <LogoutButton />
     </div>
   ) : (
