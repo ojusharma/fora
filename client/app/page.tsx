@@ -21,6 +21,7 @@ export default async function Home() {
             <div className="flex gap-5 items-center font-semibold">
               <Link href={"/"}>fora</Link>
               <Link href={"/market"}>marketplace</Link>
+              <Link href={"/map"}>map</Link>
             </div>
             <Suspense>
               <AuthButton />
