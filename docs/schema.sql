@@ -1,79 +1,214 @@
--- WARNING: This schema is for context only and is not meant to be run.
--- Table order and constraints may not be valid for execution.
+CREATE TYPE listing_status AS ENUM (
+  'open',
+  'in_progress',
+  'completed',
+  'cancelled'
+);
 
-CREATE TABLE public.listing_applicants (
-  listing_id uuid NOT NULL,
-  applicant_uid uuid NOT NULL,
-  applied_at timestamp with time zone NOT NULL DEFAULT now(),
-  status USER-DEFINED NOT NULL DEFAULT 'applied'::applicant_status,
-  message text,
-  CONSTRAINT listing_applicants_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES public.listings(id),
-  CONSTRAINT listing_applicants_applicant_uid_fkey FOREIGN KEY (applicant_uid) REFERENCES auth.users(id)
+CREATE TYPE applicant_status AS ENUM (
+  'applied',
+  'shortlisted',
+  'rejected',
+  'withdrawn'
 );
-CREATE TABLE public.listing_tags (
-  listing_id uuid NOT NULL,
-  tag_id integer NOT NULL,
-  CONSTRAINT listing_tags_pkey PRIMARY KEY (listing_id, tag_id),
-  CONSTRAINT listing_tags_listing_id_fkey FOREIGN KEY (listing_id) REFERENCES public.listings(id),
-  CONSTRAINT listing_tags_tag_id_fkey FOREIGN KEY (tag_id) REFERENCES public.tags(id)
+
+CREATE TYPE user_role AS ENUM (
+  'user',
+  'moderator',
+  'admin'
 );
-CREATE TABLE public.listings (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  description text,
-  images jsonb,
-  poster_uid uuid NOT NULL,
-  assignee_uid uuid,
-  applicants ARRAY DEFAULT '{}'::uuid[],
-  tags ARRAY DEFAULT '{}'::integer[],
-  status USER-DEFINED NOT NULL DEFAULT 'open'::listing_status,
-  location_geog USER-DEFINED,
-  latitude double precision,
-  longitude double precision,
-  deadline timestamp with time zone,
-  compensation numeric,
-  last_posted timestamp with time zone NOT NULL DEFAULT now(),
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  poster_rating numeric DEFAULT NULL::numeric,
-  assignee_rating numeric DEFAULT NULL::numeric,
-  CONSTRAINT listings_pkey PRIMARY KEY (id),
-  CONSTRAINT listings_poster_uid_fkey FOREIGN KEY (poster_uid) REFERENCES auth.users(id),
-  CONSTRAINT listings_assignee_uid_fkey FOREIGN KEY (assignee_uid) REFERENCES auth.users(id)
+
+CREATE TYPE rating_type AS ENUM (
+  'poster',
+  'assignee'
 );
-CREATE TABLE public.tags (
-  id integer NOT NULL DEFAULT nextval('tags_id_seq'::regclass),
-  name text NOT NULL UNIQUE,
-  CONSTRAINT tags_pkey PRIMARY KEY (id)
+
+
+
+CREATE TABLE tags (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE
 );
-CREATE TABLE public.user_preferences (
-  uid uuid NOT NULL,
-  tag_id integer NOT NULL,
-  CONSTRAINT user_preferences_pkey PRIMARY KEY (uid, tag_id),
-  CONSTRAINT user_preferences_uid_fkey FOREIGN KEY (uid) REFERENCES auth.users(id),
-  CONSTRAINT user_preferences_tag_id_fkey FOREIGN KEY (tag_id) REFERENCES public.tags(id)
+
+CREATE TABLE user_profiles (
+  uid UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  dob DATE,
+  phone TEXT,
+  role user_role NOT NULL DEFAULT 'user',
+  credits INTEGER NOT NULL DEFAULT 0,
+  last_updated TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- no PostGIS
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION
 );
-CREATE TABLE public.user_profiles (
-  uid uuid NOT NULL,
-  dob date,
-  phone text,
-  role USER-DEFINED NOT NULL DEFAULT 'user'::user_role,
-  credits integer NOT NULL DEFAULT 0,
-  last_updated timestamp with time zone NOT NULL DEFAULT now(),
-  location_geog USER-DEFINED,
-  latitude double precision,
-  longitude double precision,
-  CONSTRAINT user_profiles_pkey PRIMARY KEY (uid),
-  CONSTRAINT user_profiles_uid_fkey FOREIGN KEY (uid) REFERENCES auth.users(id)
+
+
+CREATE INDEX idx_user_profiles_location_latlng
+  ON user_profiles (latitude, longitude);
+
+CREATE TABLE listings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  description TEXT,
+  images JSONB,
+
+  poster_uid UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  assignee_uid UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+
+  status listing_status NOT NULL DEFAULT 'open',
+
+  -- no geography type
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
+
+  deadline TIMESTAMPTZ,
+  compensation NUMERIC(12, 2),
+
+  last_posted TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  poster_rating NUMERIC(3, 2),
+  assignee_rating NUMERIC(3, 2)
 );
-CREATE TABLE public.user_stats (
-  uid uuid NOT NULL,
-  num_listings_posted integer NOT NULL DEFAULT 0,
-  num_listings_applied integer NOT NULL DEFAULT 0,
-  num_listings_assigned integer NOT NULL DEFAULT 0,
-  num_listings_completed integer NOT NULL DEFAULT 0,
-  avg_rating numeric DEFAULT NULL::numeric,
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT user_stats_pkey PRIMARY KEY (uid),
-  CONSTRAINT user_stats_uid_fkey FOREIGN KEY (uid) REFERENCES auth.users(id)
+
+CREATE INDEX idx_listings_status ON listings (status);
+CREATE INDEX idx_listings_deadline ON listings (deadline);
+CREATE INDEX idx_listings_poster ON listings (poster_uid);
+CREATE INDEX idx_listings_assignee ON listings (assignee_uid);
+
+
+
+
+CREATE TABLE listing_tags (
+  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (listing_id, tag_id)
 );
+
+
+
+CREATE TABLE listing_applicants (
+  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  applicant_uid UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  status applicant_status NOT NULL DEFAULT 'applied',
+  message TEXT,
+
+  PRIMARY KEY (listing_id, applicant_uid)
+);
+
+CREATE INDEX idx_listing_applicants_listing ON listing_applicants (listing_id);
+CREATE INDEX idx_listing_applicants_applicant ON listing_applicants (applicant_uid);
+
+CREATE TABLE listing_ratings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  rater_uid UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  ratee_uid UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  rating_type rating_type NOT NULL,
+
+  comment TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (listing_id, rater_uid, rating_type)
+);
+
+CREATE INDEX idx_listing_ratings_listing ON listing_ratings (listing_id);
+CREATE INDEX idx_listing_ratings_ratee ON listing_ratings (ratee_uid);
+
+CREATE TABLE user_preferences (
+  uid UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (uid, tag_id)
+);
+
+CREATE INDEX idx_user_preferences_uid
+  ON user_preferences (uid);
+
+
+
+CREATE TABLE user_stats (
+  uid UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  num_listings_posted INTEGER NOT NULL DEFAULT 0,
+  num_listings_applied INTEGER NOT NULL DEFAULT 0,
+  num_listings_assigned INTEGER NOT NULL DEFAULT 0,
+  num_listings_completed INTEGER NOT NULL DEFAULT 0,
+  avg_rating NUMERIC(3, 2),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+
+
+CREATE OR REPLACE FUNCTION refresh_listing_rating_avgs(listing_uuid UUID)
+RETURNS VOID LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE listings
+  SET
+    poster_rating = sub.poster_avg,
+    assignee_rating = sub.assignee_avg
+  FROM (
+    SELECT
+      AVG(rating) FILTER (WHERE rating_type = 'poster') AS poster_avg,
+      AVG(rating) FILTER (WHERE rating_type = 'assignee') AS assignee_avg
+    FROM listing_ratings
+    WHERE listing_id = listing_uuid
+  ) AS sub
+  WHERE id = listing_uuid;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION trg_listing_ratings_after_change()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM refresh_listing_rating_avgs(NEW.listing_id);
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION trg_listing_ratings_after_delete()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM refresh_listing_rating_avgs(OLD.listing_id);
+  RETURN OLD;
+END;
+$$;
+
+CREATE TRIGGER trg_listing_ratings_after_insert
+AFTER INSERT ON listing_ratings
+FOR EACH ROW EXECUTE FUNCTION trg_listing_ratings_after_change();
+
+CREATE TRIGGER trg_listing_ratings_after_update
+AFTER UPDATE ON listing_ratings
+FOR EACH ROW EXECUTE FUNCTION trg_listing_ratings_after_change();
+
+CREATE TRIGGER trg_listing_ratings_after_delete
+AFTER DELETE ON listing_ratings
+FOR EACH ROW EXECUTE FUNCTION trg_listing_ratings_after_delete();
+
+
+
+CREATE OR REPLACE FUNCTION prevent_self_apply()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM listings
+    WHERE id = NEW.listing_id
+      AND poster_uid = NEW.applicant_uid
+  ) THEN
+    RAISE EXCEPTION 'Poster cannot apply to their own listing';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_prevent_self_apply
+BEFORE INSERT ON listing_applicants
+FOR EACH ROW EXECUTE FUNCTION prevent_self_apply();
