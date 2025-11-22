@@ -274,8 +274,8 @@ class ListingCRUD:
             .execute()
         )
         
-        # If accepted, update listing assignee
-        if status_update.status.value == "accepted" and response.data:
+        # If shortlisted, update listing assignee
+        if status_update.status.value == "shortlisted" and response.data:
             await self.supabase.table("listings").update({
                 "assignee_uid": str(applicant_uid),
                 "status": "in_progress"
