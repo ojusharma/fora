@@ -5,12 +5,13 @@ This module combines all v1 API endpoints.
 """
 
 from fastapi import APIRouter
-from app.api.v1.endpoints import listings
+from app.api.v1.endpoints import listings, feed
 
 api_router = APIRouter()
 
 # Include all endpoint routers
 api_router.include_router(listings.router, prefix="/listings", tags=["listings"])
+api_router.include_router(feed.router, prefix="/feed", tags=["feed", "recommendations"])
 
 # Add more routers here as you create them:
 # api_router.include_router(users.router, prefix="/users", tags=["users"])
