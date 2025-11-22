@@ -1,17 +1,39 @@
+"use client";
+
 import { AuthButton } from "@/components/auth-button";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { Suspense } from "react";
-import { redirect } from "next/navigation";
 import GoogleMapComponent from "@/components/map";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 
-export default async function MapPage() {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
+export default function MapPage() {
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
-  if (error || !data?.claims) {
-    redirect("/auth/login");
+  useEffect(() => {
+    async function checkAuth() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        router.push("/auth/login");
+        return;
+      }
+      
+      setIsLoading(false);
+    }
+    
+    checkAuth();
+  }, [router]);
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center">
+        <p>Loading...</p>
+      </main>
+    );
   }
 
   return (
@@ -24,9 +46,7 @@ export default async function MapPage() {
               <Link href={"/market"}>marketplace</Link>
               <Link href={"/map"}>map</Link>
             </div>
-            <Suspense>
-              <AuthButton />
-            </Suspense>
+            <AuthButton />
           </div>
         </nav>
         <div className="flex-1 flex flex-col gap-20 max-w-6xl w-full p-5">
