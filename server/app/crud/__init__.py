@@ -2,8 +2,10 @@
 
 from app.crud.user_stats import UserStatsCRUD
 from app.crud.user_preferences import UserPreferencesCRUD
+from app.crud.listing_applicants import ListingApplicantsCRUD
 
 __all__ = [
     "UserStatsCRUD",
     "UserPreferencesCRUD",
+    "ListingApplicantsCRUD",
 ]
