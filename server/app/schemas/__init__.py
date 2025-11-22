@@ -22,17 +22,29 @@ from app.schemas.listing_applicants import (
     ListingApplicantWithDetailsResponse,
     ApplicantFilters,
 )
+from app.schemas.user import (
+    UserRole,
+    UserProfileBase,
+    UserProfileCreate,
+    UserProfileUpdate,
+    UserProfileResponse,
+    UserCreditsUpdate,
+    UserLocationUpdate,
+)
 
 __all__ = [
+    # User Stats
     "UserStatsBase",
     "UserStatsCreate",
     "UserStatsUpdate",
     "UserStatsResponse",
+    # User Preferences
     "UserPreferenceBase",
     "UserPreferenceCreate",
     "UserPreferenceBulkCreate",
     "UserPreferenceResponse",
     "UserPreferencesWithTagsResponse",
+    # Listing Applicants
     "ApplicantStatus",
     "ListingApplicantBase",
     "ListingApplicantCreate",
@@ -40,4 +52,12 @@ __all__ = [
     "ListingApplicantResponse",
     "ListingApplicantWithDetailsResponse",
     "ApplicantFilters",
+    # User Profiles
+    "UserRole",
+    "UserProfileBase",
+    "UserProfileCreate",
+    "UserProfileUpdate",
+    "UserProfileResponse",
+    "UserCreditsUpdate",
+    "UserLocationUpdate",
 ]
