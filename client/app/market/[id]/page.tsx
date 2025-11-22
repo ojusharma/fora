@@ -82,6 +82,11 @@ export default async function Page({
                   Deadline: {new Date(listing.deadline).toLocaleString()}
                 </p>
               )}
+              {listing.location_address && (
+                <p className="text-xs text-muted-foreground">
+                  {listing.location_address}
+                </p>
+              )}
             </header>
 
             {listing.description && (

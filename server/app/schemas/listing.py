@@ -33,7 +33,7 @@ class ListingBase(BaseModel):
     description: Optional[str] = None
     images: Optional[List[str]] = None
     tags: Optional[List[int]] = Field(default_factory=list)
-    location_address: Optional[str] = None
+    location_address: Optional[str] = Field(None, max_length=500)
     latitude: Optional[float] = Field(None, ge=-90, le=90)
     longitude: Optional[float] = Field(None, ge=-180, le=180)
     deadline: Optional[datetime] = None
@@ -51,7 +51,7 @@ class ListingUpdate(BaseModel):
     description: Optional[str] = None
     images: Optional[List[str]] = None
     tags: Optional[List[int]] = None
-    location_address: Optional[str] = None
+    location_address: Optional[str] = Field(None, max_length=500)
     latitude: Optional[float] = Field(None, ge=-90, le=90)
     longitude: Optional[float] = Field(None, ge=-180, le=180)
     deadline: Optional[datetime] = None
