@@ -25,7 +25,12 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     
     # CORS Settings
-    cors_origins: list = ["http://localhost:3000"]
+    cors_origins: str = "http://localhost:3000,http://localhost:3001"
+    
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parse CORS origins from comma-separated string."""
+        return [origin.strip() for origin in self.cors_origins.split(",")]
     
     class Config:
         env_file = ".env"

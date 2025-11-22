@@ -2,6 +2,7 @@
 Main FastAPI application entry point.
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
@@ -12,6 +13,26 @@ from app.api.v1.api import api_router
 # Get application settings
 settings = get_settings()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for startup and shutdown."""
+    # Startup
+    print("=" * 50)
+    print(f"{settings.app_name} v{settings.app_version}")
+    print("=" * 50)
+    print("Supabase connection initialized")
+    print(f"API documentation: http://localhost:8000/docs")
+    print(f"API v1 prefix: {settings.api_v1_prefix}")
+    print("Server ready to accept requests")
+    print("=" * 50)
+    
+    yield
+    
+    # Shutdown
+    print(f"Shutting down {settings.app_name}...")
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title=settings.app_name,
@@ -19,15 +40,17 @@ app = FastAPI(
     version=settings.app_version,
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # Configure CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 # Include API router
@@ -55,24 +78,3 @@ async def health_check():
         "timestamp": datetime.utcnow().isoformat(),
         "version": settings.app_version,
     }
-
-
-# ==================== STARTUP/SHUTDOWN EVENTS ====================
-
-@app.on_event("startup")
-async def startup_event():
-    """Run on application startup."""
-    print("=" * 50)
-    print(f"{settings.app_name} v{settings.app_version}")
-    print("=" * 50)
-    print("Supabase connection initialized")
-    print(f"API documentation: http://localhost:8000/docs")
-    print(f"API v1 prefix: {settings.api_v1_prefix}")
-    print("Server ready to accept requests")
-    print("=" * 50)
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Run on application shutdown."""
-    print("Shutting down {settings.app_name}...")
