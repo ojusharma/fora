@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     # Supabase Configuration
     supabase_url: str
     supabase_key: str
+    supabase_service_role_key: str
     
     # API Settings
     api_v1_prefix: str = "/api/v1"
