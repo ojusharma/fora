@@ -257,6 +257,19 @@ export default function MapPage() {
     setRadiusCenter(null);
   };
 
+  // Pan to first filtered listing when filters change
+  useEffect(() => {
+    if (filteredListings.length > 0 && (nameFilter || radiusFilter)) {
+      const firstListing = filteredListings[0];
+      if (firstListing.latitude && firstListing.longitude) {
+        setMapCenter({
+          lat: firstListing.latitude,
+          lng: firstListing.longitude,
+        });
+      }
+    }
+  }, [filteredListings.length, nameFilter, radiusFilter]);
+
   if (!isAuthChecked) {
     return (
       <main className="min-h-screen flex items-center justify-center">
