@@ -58,7 +58,8 @@ CREATE TABLE listings (
 
   status listing_status NOT NULL DEFAULT 'open',
 
-  -- no geography type
+  -- location fields
+  location_address TEXT,
   latitude DOUBLE PRECISION,
   longitude DOUBLE PRECISION,
 

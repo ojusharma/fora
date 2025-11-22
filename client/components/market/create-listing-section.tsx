@@ -80,6 +80,9 @@ export function CreateListingSection({
   const [currency, setCurrency] = useState("USD");
   const [deadline, setDeadline] = useState("");
   const [description, setDescription] = useState("");
+  const [location, setLocation] = useState("");
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
   const [images, setImages] = useState<ListingImage[]>([
     { url: "", alt: "" },
   ]);
@@ -179,8 +182,9 @@ export function CreateListingSection({
           .map((image) => image.url.trim())
           .filter((url) => url.length > 0),
         tags: [] as number[],
-        latitude: null as number | null,
-        longitude: null as number | null,
+        location_address: location.trim() || null,
+        latitude: latitude,
+        longitude: longitude,
         deadline: deadline ? new Date(deadline).toISOString() : null,
         compensation: compensation ? Number(compensation) : null,
       };
@@ -239,6 +243,9 @@ export function CreateListingSection({
       setCurrency("USD");
       setDeadline("");
       setDescription("");
+      setLocation("");
+      setLatitude(null);
+      setLongitude(null);
       setImages([{ url: "", alt: "" }]);
       setActiveTab("mine");
       setDialogOpen(false);
@@ -336,6 +343,42 @@ export function CreateListingSection({
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="location">Location</Label>
+              <Input
+                id="location"
+                placeholder="Enter location (e.g., New York, NY)"
+                value={location}
+                onChange={async (e) => {
+                  const value = e.target.value;
+                  setLocation(value);
+                  
+                  // Geocode the location using Google Maps API
+                  if (value.trim().length > 3) {
+                    try {
+                      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+                      const response = await fetch(
+                        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(value)}&key=${apiKey}`
+                      );
+                      const data = await response.json();
+                      
+                      if (data.results && data.results.length > 0) {
+                        const { lat, lng } = data.results[0].geometry.location;
+                        setLatitude(lat);
+                        setLongitude(lng);
+                      }
+                    } catch (error) {
+                      console.error("Failed to geocode location:", error);
+                    }
+                  }
+                }}
+              />
+              {latitude && longitude && (
+                <p className="text-[11px] text-muted-foreground">
+                  Coordinates: {latitude.toFixed(4)}, {longitude.toFixed(4)}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="images">Images</Label>
