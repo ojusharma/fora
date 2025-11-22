@@ -14,6 +14,22 @@ export default async function MarketPage() {
     redirect("/auth/login");
   }
 
+  const baseUrl =
+    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+  let initialListings: any[] = [];
+
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/listings`, {
+      cache: "no-store",
+    });
+    if (res.ok) {
+      initialListings = await res.json();
+    }
+  } catch {
+    initialListings = [];
+  }
+
   return (
     <main className="min-h-screen flex flex-col items-center">
       <div className="flex-1 w-full flex flex-col gap-20 items-center">
@@ -33,9 +49,10 @@ export default async function MarketPage() {
           <main className="flex-1 flex flex-col gap-6 px-0">
             <h1 className="text-2xl font-semibold">Marketplace</h1>
             <p className="text-sm text-muted-foreground">
-              Create a new listing and then manage it from the &quot;My listings&quot; tab.
+              Create a new listing and then manage it from the &quot;My
+              listings&quot; tab.
             </p>
-            <CreateListingSection />
+            <CreateListingSection initialListings={initialListings} />
           </main>
         </div>
 

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 type ListingImage = {
   url: string;
@@ -31,7 +32,7 @@ type ListingImage = {
 };
 
 type Listing = {
-  id: number;
+  id: string;
   name: string;
   description: string;
   compensation: string;
@@ -43,50 +44,37 @@ type Listing = {
   reviewsCount?: number;
 };
 
-const featuredListings: Listing[] = [
-  {
-    id: 1,
-    name: "I will design a modern landing page for your SaaS",
-    compensation: "120",
-    currency: "USD",
-    description: "Conversion-focused, responsive, and on-brand.",
-    seller: "studioflow",
-    rating: 4.9,
-    reviewsCount: 87,
-  },
-  {
-    id: 2,
-    name: "I will build a Supabase + Next.js MVP in a week",
-    compensation: "950",
-    currency: "USD",
-    description: "Auth, database, and basic dashboard wired up.",
-    seller: "shipfast",
-    rating: 5.0,
-    reviewsCount: 41,
-  },
-  {
-    id: 3,
-    name: "I will create a brand kit for your startup",
-    compensation: "260",
-    currency: "USD",
-    description: "Logo, colors, and typography ready to use.",
-    seller: "brandlab",
-    rating: 4.8,
-    reviewsCount: 132,
-  },
-  {
-    id: 4,
-    name: "I will audit your onboarding and suggest improvements",
-    compensation: "180",
-    currency: "USD",
-    description: "Actionable UX review with a prioritized checklist.",
-    seller: "uxclinic",
-    rating: 4.9,
-    reviewsCount: 59,
-  },
-];
+type CreateListingSectionProps = {
+  initialListings: any[];
+};
 
-export function CreateListingSection() {
+function mapApiListing(item: any): Listing {
+  return {
+    id: String(item.id),
+    name: item.name ?? "",
+    description: item.description ?? "",
+    compensation:
+      item.compensation !== null && item.compensation !== undefined
+        ? String(item.compensation)
+        : "",
+    currency: item.currency ?? "USD",
+    deadline: item.deadline ?? undefined,
+    images: Array.isArray(item.images)
+      ? item.images.map((url: string) => ({
+          url,
+          alt: item.name ?? "",
+        }))
+      : undefined,
+    seller: "Creator",
+    rating:
+      typeof item.poster_rating === "number" ? item.poster_rating : undefined,
+    reviewsCount: undefined,
+  };
+}
+
+export function CreateListingSection({
+  initialListings,
+}: CreateListingSectionProps) {
   const [name, setName] = useState("");
   const [compensation, setCompensation] = useState("");
   const [currency, setCurrency] = useState("USD");
@@ -99,14 +87,18 @@ export function CreateListingSection() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [listings, setListings] = useState<Listing[]>([]);
+  const [myListings, setMyListings] = useState<Listing[]>([]);
+  const [marketListings, setMarketListings] = useState<Listing[]>(() =>
+    Array.isArray(initialListings)
+      ? initialListings.map((item) => mapApiListing(item))
+      : [],
+  );
   const [activeTab, setActiveTab] = useState<"marketplace" | "mine">(
     "marketplace",
   );
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const handleImageUpload = async (
-    event: ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
@@ -222,8 +214,10 @@ export function CreateListingSection() {
         throw new Error(message);
       }
 
+      const created = await res.json();
+
       const newListing: Listing = {
-        id: Date.now(),
+        id: String(created.id ?? Date.now().toString()),
         name: name.trim(),
         compensation: compensation.trim(),
         currency: currency.trim() || "USD",
@@ -238,7 +232,8 @@ export function CreateListingSection() {
         seller: "You",
       };
 
-      setListings((prev) => [newListing, ...prev]);
+      setMyListings((prev) => [newListing, ...prev]);
+      setMarketListings((prev) => [newListing, ...prev]);
       setName("");
       setCompensation("");
       setCurrency("USD");
@@ -246,6 +241,7 @@ export function CreateListingSection() {
       setDescription("");
       setImages([{ url: "", alt: "" }]);
       setActiveTab("mine");
+      setDialogOpen(false);
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Failed to create listing",
@@ -257,7 +253,7 @@ export function CreateListingSection() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Dialog>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <div className="flex items-center justify-between gap-4">
           <div className="inline-flex items-center rounded-md bg-muted p-1 text-xs">
             <button
@@ -286,7 +282,9 @@ export function CreateListingSection() {
             </button>
           </div>
           <DialogTrigger asChild>
-            <Button size="sm">New listing</Button>
+            <Button size="sm" onClick={() => setDialogOpen(true)}>
+              New listing
+            </Button>
           </DialogTrigger>
         </div>
 
@@ -359,7 +357,7 @@ export function CreateListingSection() {
                 </p>
               )}
               {uploadError && (
-                <p className="text-[11px] text-red-500 text-[11px]">
+                <p className="text-[11px] text-red-500">
                   {uploadError}
                 </p>
               )}
@@ -375,7 +373,11 @@ export function CreateListingSection() {
                         >
                           <img
                             src={image.url}
-                            alt={image.alt || name || `Listing image ${index + 1}`}
+                            alt={
+                              image.alt ||
+                              name ||
+                              `Listing image ${index + 1}`
+                            }
                             className="h-full w-full object-cover"
                           />
                         </div>
@@ -411,12 +413,18 @@ export function CreateListingSection() {
       </Dialog>
 
       {activeTab === "marketplace" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {featuredListings.map((listing) => (
-            <ListingCard key={listing.id} listing={listing} />
-          ))}
-        </div>
-      ) : listings.length === 0 ? (
+        marketListings.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No listings yet. Be the first to create one.
+          </p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {marketListings.map((listing) => (
+              <ListingCard key={listing.id} listing={listing} />
+            ))}
+          </div>
+        )
+      ) : myListings.length === 0 ? (
         <Card className="flex items-center justify-center">
           <CardContent className="text-sm text-muted-foreground">
             You haven&apos;t created any listings yet.
@@ -424,7 +432,7 @@ export function CreateListingSection() {
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {listings.map((listing) => (
+          {myListings.map((listing) => (
             <ListingCard key={listing.id} listing={listing} />
           ))}
         </div>
@@ -435,48 +443,51 @@ export function CreateListingSection() {
 
 function ListingCard({ listing }: { listing: Listing }) {
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
-      {listing.images && listing.images.length > 0 && listing.images[0].url ? (
-        <div className="h-24 bg-muted overflow-hidden">
-          <img
-            src={listing.images[0].url}
-            alt={listing.images[0].alt || listing.name}
-            className="h-full w-full object-cover"
-          />
-        </div>
-      ) : (
-        <div className="h-20 bg-gradient-to-br from-emerald-500/80 via-sky-500/80 to-indigo-500/80" />
-      )}
-      <CardContent className="p-4 space-y-2">
-        <p className="text-xs text-muted-foreground">{listing.seller}</p>
-        <p className="text-sm font-semibold">{listing.name}</p>
-        {listing.description && (
-          <p className="text-xs text-muted-foreground">
-            {listing.description}
-          </p>
-        )}
-      </CardContent>
-      <CardFooter className="flex items-center justify-between px-4 pb-4 pt-0 text-xs">
-        {listing.rating ? (
-          <span className="flex items-center gap-1 text-foreground">
-            <span>★</span>
-            <span>
-              {listing.rating.toFixed(1)}
-              {listing.reviewsCount
-                ? ` (${listing.reviewsCount.toLocaleString()})`
-                : ""}
-            </span>
-          </span>
+    <Link href={`/market/${listing.id}`} className="block">
+      <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
+        {listing.images && listing.images.length > 0 && listing.images[0].url ? (
+          <div className="h-24 bg-muted overflow-hidden">
+            <img
+              src={listing.images[0].url}
+              alt={listing.images[0].alt || listing.name}
+              className="h-full w-full object-cover"
+            />
+          </div>
         ) : (
-          <span className="text-muted-foreground">New</span>
+          <div className="h-20 bg-gradient-to-br from-emerald-500/80 via-sky-500/80 to-indigo-500/80" />
         )}
-        {listing.compensation && (
-          <span className="text-sm font-semibold">
-            From {listing.currency || "USD"}{" "}
-            {Number(listing.compensation).toLocaleString()}
-          </span>
-        )}
-      </CardFooter>
-    </Card>
+        <CardContent className="p-4 space-y-2">
+          <p className="text-xs text-muted-foreground">{listing.seller}</p>
+          <p className="text-sm font-semibold">{listing.name}</p>
+          {listing.description && (
+            <p className="text-xs text-muted-foreground">
+              {listing.description}
+            </p>
+          )}
+        </CardContent>
+        <CardFooter className="flex items-center justify-between px-4 pb-4 pt-0 text-xs">
+          {listing.rating ? (
+            <span className="flex items-center gap-1 text-foreground">
+              <span>★</span>
+              <span>
+                {listing.rating.toFixed(1)}
+                {listing.reviewsCount
+                  ? ` (${listing.reviewsCount.toLocaleString()})`
+                  : ""}
+              </span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">New</span>
+          )}
+          {listing.compensation && (
+            <span className="text-sm font-semibold">
+              From {listing.currency || "USD"}{" "}
+              {Number(listing.compensation).toLocaleString()}
+            </span>
+          )}
+        </CardFooter>
+      </Card>
+    </Link>
   );
 }
+
