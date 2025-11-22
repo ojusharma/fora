@@ -1,0 +1,19 @@
+# ML Models and Training Artifacts
+*.pkl
+*.pickle
+*.joblib
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.onnx
+*.pb
+model_info.txt
+models/
+checkpoints/
+
+# Training data
+training_data/
+sample_data/
+*.npy
+*.npz
