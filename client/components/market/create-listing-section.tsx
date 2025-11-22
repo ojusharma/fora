@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 import {
   Card,
   CardContent,
@@ -31,7 +31,7 @@ type ListingImage = {
 };
 
 type Listing = {
-  id: string;
+  id: number;
   name: string;
   description: string;
   compensation: string;
@@ -45,7 +45,7 @@ type Listing = {
 
 const featuredListings: Listing[] = [
   {
-    id: "1",
+    id: 1,
     name: "I will design a modern landing page for your SaaS",
     compensation: "120",
     currency: "USD",
@@ -55,7 +55,7 @@ const featuredListings: Listing[] = [
     reviewsCount: 87,
   },
   {
-    id: "2",
+    id: 2,
     name: "I will build a Supabase + Next.js MVP in a week",
     compensation: "950",
     currency: "USD",
@@ -65,7 +65,7 @@ const featuredListings: Listing[] = [
     reviewsCount: 41,
   },
   {
-    id: "3",
+    id: 3,
     name: "I will create a brand kit for your startup",
     compensation: "260",
     currency: "USD",
@@ -75,7 +75,7 @@ const featuredListings: Listing[] = [
     reviewsCount: 132,
   },
   {
-    id: "4",
+    id: 4,
     name: "I will audit your onboarding and suggest improvements",
     compensation: "180",
     currency: "USD",
@@ -100,61 +100,9 @@ export function CreateListingSection() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
-  const [marketListings, setMarketListings] = useState<Listing[]>([]);
-  const [isLoadingListings, setIsLoadingListings] = useState(false);
-  const [listingsError, setListingsError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"marketplace" | "mine">(
     "marketplace",
   );
-  const [dialogOpen, setDialogOpen] = useState(false);
-
-  useEffect(() => {
-    const loadListings = async () => {
-      setIsLoadingListings(true);
-      setListingsError(null);
-
-      try {
-        const baseUrl =
-          process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-
-        const res = await fetch(`${baseUrl}/api/v1/listings`);
-        if (!res.ok) {
-          throw new Error("Failed to load listings");
-        }
-
-        const data = await res.json();
-
-        const mapped: Listing[] = (data as any[]).map((item) => ({
-          id: String(item.id),
-          name: item.name,
-          description: item.description ?? "",
-          compensation:
-            item.compensation !== null && item.compensation !== undefined
-              ? String(item.compensation)
-              : "",
-          currency: item.currency ?? "USD",
-          deadline: item.deadline ?? undefined,
-          images: (item.images ?? []).map((url: string) => ({
-            url,
-            alt: item.name,
-          })),
-          seller: "Creator",
-          rating: item.poster_rating ?? undefined,
-          reviewsCount: undefined,
-        }));
-
-        setMarketListings(mapped);
-      } catch (err) {
-        setListingsError(
-          err instanceof Error ? err.message : "Failed to load listings",
-        );
-      } finally {
-        setIsLoadingListings(false);
-      }
-    };
-
-    loadListings();
-  }, []);
 
   const handleImageUpload = async (
     event: ChangeEvent<HTMLInputElement>,
@@ -274,10 +222,8 @@ export function CreateListingSection() {
         throw new Error(message);
       }
 
-      const created = await res.json();
-
       const newListing: Listing = {
-        id: String(created.id ?? Date.now().toString()),
+        id: Date.now(),
         name: name.trim(),
         compensation: compensation.trim(),
         currency: currency.trim() || "USD",
@@ -293,7 +239,6 @@ export function CreateListingSection() {
       };
 
       setListings((prev) => [newListing, ...prev]);
-      setMarketListings((prev) => [newListing, ...prev]);
       setName("");
       setCompensation("");
       setCurrency("USD");
@@ -301,7 +246,6 @@ export function CreateListingSection() {
       setDescription("");
       setImages([{ url: "", alt: "" }]);
       setActiveTab("mine");
-      setDialogOpen(false);
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Failed to create listing",
@@ -313,7 +257,7 @@ export function CreateListingSection() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog>
         <div className="flex items-center justify-between gap-4">
           <div className="inline-flex items-center rounded-md bg-muted p-1 text-xs">
             <button
@@ -467,21 +411,11 @@ export function CreateListingSection() {
       </Dialog>
 
       {activeTab === "marketplace" ? (
-        isLoadingListings ? (
-          <p className="text-sm text-muted-foreground">Loading listings...</p>
-        ) : listingsError ? (
-          <p className="text-sm text-red-500">{listingsError}</p>
-        ) : marketListings.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No listings yet. Be the first to create one.
-          </p>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {marketListings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
-            ))}
-          </div>
-        )
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {featuredListings.map((listing) => (
+            <ListingCard key={listing.id} listing={listing} />
+          ))}
+        </div>
       ) : listings.length === 0 ? (
         <Card className="flex items-center justify-center">
           <CardContent className="text-sm text-muted-foreground">
