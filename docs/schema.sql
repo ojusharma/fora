@@ -104,25 +104,6 @@ CREATE TABLE listing_applicants (
 CREATE INDEX idx_listing_applicants_listing ON listing_applicants (listing_id);
 CREATE INDEX idx_listing_applicants_applicant ON listing_applicants (applicant_uid);
 
-CREATE TABLE listing_ratings (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-  listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
-  rater_uid UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  ratee_uid UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-
-  rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
-  rating_type rating_type NOT NULL,
-
-  comment TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-
-  UNIQUE (listing_id, rater_uid, rating_type)
-);
-
-CREATE INDEX idx_listing_ratings_listing ON listing_ratings (listing_id);
-CREATE INDEX idx_listing_ratings_ratee ON listing_ratings (ratee_uid);
-
 CREATE TABLE user_preferences (
   uid UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
