@@ -7,6 +7,7 @@ This module handles all environment variables and application configuration.
 import os
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -27,6 +28,10 @@ class Settings(BaseSettings):
     
     # CORS Settings
     cors_origins: str = "http://localhost:3000,http://localhost:3001"
+    
+    # Email Settings
+    resend_api_key: Optional[str] = None
+    from_email: str = "onboarding@resend.dev"
     
     @property
     def cors_origins_list(self) -> list[str]:

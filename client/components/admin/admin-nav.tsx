@@ -8,6 +8,7 @@ const navItems = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/listings", label: "Listings" },
+  { href: "/admin/rewards", label: "Rewards" },
   { href: "/admin/ml", label: "ML Training" },
 ];
 

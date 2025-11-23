@@ -31,3 +31,28 @@ def get_supabase_client() -> Client:
         )
     
     return create_client(settings.supabase_url, settings.supabase_key)
+
+
+@lru_cache()
+def get_service_role_client() -> Client:
+    """
+    Returns cached Supabase client instance with service role key.
+    
+    This client has admin privileges and should only be used for server-side operations
+    that require elevated permissions (like sending emails, accessing user data, etc.)
+    
+    Returns:
+        Client: The initialized Supabase client with service role
+        
+    Raises:
+        ValueError: If Supabase credentials are not set
+    """
+    settings = get_settings()
+    
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        raise ValueError(
+            "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env file. "
+            "Get them from: https://app.supabase.com/project/_/settings/api"
+        )
+    
+    return create_client(settings.supabase_url, settings.supabase_service_role_key)
