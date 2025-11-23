@@ -86,6 +86,13 @@ export function CreateListingSection({
   const [location, setLocation] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationSuggestions, setLocationSuggestions] = useState<Array<{
+    description: string;
+    place_id: string;
+    lat: number;
+    lng: number;
+  }>>([]);
+  const [isGeocodingLocation, setIsGeocodingLocation] = useState(false);
   const [images, setImages] = useState<ListingImage[]>([
     { url: "", alt: "" },
   ]);
@@ -308,6 +315,62 @@ export function CreateListingSection({
     return availableTags.find((tag) => tag.id === tagId)?.name || "";
   };
 
+  // Fetch location suggestions from Google Places API
+  const fetchLocationSuggestions = async (input: string) => {
+    if (input.trim().length < 3) {
+      setLocationSuggestions([]);
+      return;
+    }
+
+    setIsGeocodingLocation(true);
+    try {
+      // Use Google Maps Geocoding API instead
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(input)}&key=${apiKey}`,
+        { mode: 'cors' }
+      );
+      const data = await response.json();
+
+      if (data.results && data.results.length > 0) {
+        setLocationSuggestions(
+          data.results.slice(0, 5).map((result: any) => ({
+            description: result.formatted_address,
+            place_id: result.place_id,
+            lat: result.geometry.location.lat,
+            lng: result.geometry.location.lng,
+          }))
+        );
+      } else {
+        setLocationSuggestions([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch location suggestions:", error);
+      setLocationSuggestions([]);
+    } finally {
+      setIsGeocodingLocation(false);
+    }
+  };
+
+  // Select a location suggestion and set coordinates
+  const selectLocation = async (description: string, lat: number, lng: number) => {
+    setLocation(description);
+    setLocationSuggestions([]);
+    setLatitude(lat);
+    setLongitude(lng);
+  };
+
+  // Debounce location input
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (location) {
+        fetchLocationSuggestions(location);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [location]);
+
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -457,6 +520,7 @@ export function CreateListingSection({
       setLocation("");
       setLatitude(null);
       setLongitude(null);
+      setLocationSuggestions([]);
       setImages([{ url: "", alt: "" }]);
       setTags([]);
       setTagInput("");
@@ -558,38 +622,44 @@ export function CreateListingSection({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
-                placeholder="Enter location (e.g., New York, NY)"
-                value={location}
-                onChange={async (e) => {
-                  const value = e.target.value;
-                  setLocation(value);
-                  
-                  // Geocode the location using Google Maps API
-                  if (value.trim().length > 3) {
-                    try {
-                      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-                      const response = await fetch(
-                        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(value)}&key=${apiKey}`
-                      );
-                      const data = await response.json();
-                      
-                      if (data.results && data.results.length > 0) {
-                        const { lat, lng } = data.results[0].geometry.location;
-                        setLatitude(lat);
-                        setLongitude(lng);
-                      }
-                    } catch (error) {
-                      console.error("Failed to geocode location:", error);
+              <Label htmlFor="location">
+                Location
+                {isGeocodingLocation && (
+                  <span className="ml-2 text-xs text-muted-foreground">(searching...)</span>
+                )}
+              </Label>
+              <div className="relative">
+                <Input
+                  id="location"
+                  placeholder="Enter location (e.g., New York, NY)"
+                  value={location}
+                  onChange={(e) => {
+                    setLocation(e.target.value);
+                    if (!e.target.value.trim()) {
+                      setLocationSuggestions([]);
+                      setLatitude(null);
+                      setLongitude(null);
                     }
-                  }
-                }}
-              />
+                  }}
+                />
+                {locationSuggestions.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full rounded-md border bg-popover shadow-md max-h-48 overflow-y-auto">
+                    {locationSuggestions.map((suggestion) => (
+                      <button
+                        key={suggestion.place_id}
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                        onClick={() => selectLocation(suggestion.description, suggestion.lat, suggestion.lng)}
+                      >
+                        {suggestion.description}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               {latitude && longitude && (
                 <p className="text-[11px] text-muted-foreground">
-                  Coordinates: {latitude.toFixed(4)}, {longitude.toFixed(4)}
+                  📍 {latitude.toFixed(4)}, {longitude.toFixed(4)}
                 </p>
               )}
             </div>
