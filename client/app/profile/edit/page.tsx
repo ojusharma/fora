@@ -9,6 +9,8 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/notification-bell";
 
+export const dynamic = 'force-dynamic';
+
 interface UserProfile {
   uid: string;
   display_name?: string;

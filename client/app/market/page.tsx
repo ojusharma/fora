@@ -8,6 +8,8 @@ import { NotificationBell } from "@/components/notification-bell";
 import { CreditsDisplay } from "@/components/credits-display";
 import { AdminLink } from "@/components/admin-link";
 
+export const dynamic = 'force-dynamic';
+
 export default function MarketPage() {
   const baseUrl =
     process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";

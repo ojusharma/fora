@@ -9,6 +9,8 @@ import { NotificationBell } from "@/components/notification-bell";
 import { CreditsDisplay } from "@/components/credits-display";
 import { AdminLink } from "@/components/admin-link";
 
+export const dynamic = 'force-dynamic';
+
 
 export default function Home() {
 

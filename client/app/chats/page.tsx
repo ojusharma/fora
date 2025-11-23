@@ -8,6 +8,8 @@ import ChatsApp from '@/components/chats/chats-app'
 import { NotificationBell } from '@/components/notification-bell'
 import { CreditsDisplay } from '@/components/credits-display'
 
+export const dynamic = 'force-dynamic';
+
 async function ChatsContent({ searchParams }: { searchParams?: Promise<{ listing?: string }> }) {
   const params = await searchParams;
   

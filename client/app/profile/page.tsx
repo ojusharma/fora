@@ -9,6 +9,8 @@ import { CreditsDisplay } from "@/components/credits-display";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
+export const dynamic = 'force-dynamic';
+
 async function ProfileData() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
