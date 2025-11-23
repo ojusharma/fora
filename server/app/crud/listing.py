@@ -130,49 +130,86 @@ class ListingCRUD:
         return response.data if response.data else []
 
     async def update_listing(
-        self, listing_id: UUID, listing: ListingUpdate, user_uid: UUID
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Update a listing.
-        
-        Args:
-            listing_id: The listing ID
-            listing: Updated listing data
-            user_uid: UID of the user updating (must be poster)
-            
-        Returns:
-            Updated listing data or None if not found/unauthorized
-        """
-        # Check if user is the poster
+    self, listing_id: UUID, listing: ListingUpdate, user_uid: UUID
+) -> Optional[Dict[str, Any]]:
+
+        # 1. Check if user is poster
         existing = await self.get_listing(listing_id)
         if not existing or existing["poster_uid"] != str(user_uid):
             return None
 
-        # Filter out None values
-        update_data = {
-            k: v for k, v in listing.model_dump().items() if v is not None
-        }
-        
+        # 2. Compute changes BEFORE updating
+        old_status = existing.get("status")
+        old_deadline = existing.get("deadline")
+
+        # 3. Build update dict
+        update_data = {k: v for k, v in listing.model_dump().items() if v is not None}
+
         if not update_data:
             return existing
 
-        # Convert datetime to ISO string
+        # Convert values
         if update_data.get("deadline"):
             update_data["deadline"] = update_data["deadline"].isoformat()
-        
-        # Convert enum to string
+
         if update_data.get("status"):
             update_data["status"] = update_data["status"].value
 
         update_data["updated_at"] = datetime.utcnow().isoformat()
 
+        # 4. Perform update
         response = (
             self.supabase.table("listings")
             .update(update_data)
             .eq("id", str(listing_id))
             .execute()
         )
-        return response.data[0] if response.data else None
+
+        updated_listing = response.data[0] if response.data else None
+        if not updated_listing:
+            return None
+
+        from app.crud.listing_applicants import ListingApplicantsCRUD
+        from app.schemas.notification import NotificationCreate
+        from app.crud.notification import NotificationCRUD
+
+        applicants_crud = ListingApplicantsCRUD(self.supabase)
+        notif = NotificationCRUD(self.supabase)
+
+        # Get all applicants for this listing
+        applicants = await applicants_crud.get_listing_applicants(listing_id)
+
+        # 5a. Status changed
+        if "status" in update_data and update_data["status"] != old_status:
+            for a in applicants:
+                await notif.create_notification(
+                    NotificationCreate(
+                        user_uid=a["applicant_uid"],
+                        title="Listing status updated",
+                        body=(
+                            f"The listing '{existing['name']}' has changed status "
+                            f"from '{old_status}' to '{update_data['status']}'."
+                        ),
+                        redirect_url=f"/market/{listing_id}",
+                    )
+                )
+
+        # 5b. Deadline changed
+        if "deadline" in update_data and update_data["deadline"] != old_deadline:
+            for a in applicants:
+                await notif.create_notification(
+                    NotificationCreate(
+                        user_uid=a["applicant_uid"],
+                        title="Listing deadline updated",
+                        body=(
+                            f"The deadline for '{existing['name']}' "
+                            f"was updated to {update_data['deadline']}."
+                        ),
+                        redirect_url=f"/market/{listing_id}",
+                    )
+                )
+
+        return updated_listing
 
     async def delete_listing(
         self, listing_id: UUID, user_uid: UUID

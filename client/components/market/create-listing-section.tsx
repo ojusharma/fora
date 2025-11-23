@@ -32,6 +32,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { Wand2 } from "lucide-react";
 
 // Helper function to calculate distance between two coordinates (Haversine formula)
 function calculateDistance(
@@ -675,6 +676,30 @@ export function CreateListingSection({
 
   const hasActiveFilters = nameFilter || locationFilter || selectedFilterTags.length > 0;
 
+  async function enhanceDescription() {
+  if (!description.trim()) return;
+
+  try {
+    setIsSubmitting(true);
+
+    const res = await fetch("/api/enhance-description", {
+      method: "POST",
+      body: JSON.stringify({ text: description }),
+    });
+
+    const data = await res.json();
+    if (data.enhanced) {
+      setDescription(data.enhanced);
+    }
+  } catch (err) {
+    console.error("Enhancement failed:", err);
+  } finally {
+    setIsSubmitting(false);
+  }
+}
+
+
+
   return (
     <div className="flex flex-col gap-4">
       {/* Filter Section - Only show on marketplace tab */}
@@ -965,15 +990,26 @@ export function CreateListingSection({
                 )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">Description</Label>
+
+            <div className="relative">
               <textarea
                 id="description"
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="Explain what you do, what the buyer gets, and any requirements."
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder="Explain what you do..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
+
+              <button
+                type="button"
+                onClick={enhanceDescription}
+                className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+              >
+                <Wand2 className="w-4 h-4" />
+              </button>
             </div>
+          </div>
             <div className="space-y-2">
               <Label htmlFor="tags">Tags</Label>
               <div className="relative">
