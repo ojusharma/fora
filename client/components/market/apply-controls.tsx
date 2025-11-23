@@ -25,17 +25,17 @@ export default function ApplyControls({ listingId, posterUid, currentUserId }: P
   if (posterUid && posterUid === currentUserId) return null;
 
   async function handleApply() {
+    if (!currentUserId) return;
     setError(null);
     // Do not prompt the user for a message; always submit with no message.
     const message = null;
     setLoading(true);
     try {
       const res = await fetch(
-        `${baseUrl}/api/v1/listings/${encodeURIComponent(listingId)}/apply?user_uid=${encodeURIComponent(currentUserId)}`,
+        `${baseUrl}/api/v1/listings/${encodeURIComponent(listingId)}/applicants/${encodeURIComponent(currentUserId)}/apply`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: null }),
         },
       );
       if (!res.ok) {

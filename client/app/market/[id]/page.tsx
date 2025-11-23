@@ -99,7 +99,7 @@ export default function Page() {
             }
           }
         } else if (uid) {
-          const myAppsRes = await fetch(`${baseUrl}/api/v1/listings/users/${encodeURIComponent(uid)}/applications`, { cache: "no-store" });
+          const myAppsRes = await fetch(`${baseUrl}/api/v1/listings/user/${encodeURIComponent(uid)}`, { cache: "no-store" });
           if (myAppsRes.ok) {
             const myApps = await myAppsRes.json();
             if (Array.isArray(myApps) && myApps.length > 0) {

@@ -51,12 +51,34 @@ async def apply_to_listing(
     Note: The poster cannot apply to their own listing (prevented by database trigger).
     TODO: Add authentication to get current user ID instead of accepting it in request.
     """
-    # TODO: Get applicant_uid from authentication context
-    # For now, this endpoint needs to be updated when auth is implemented
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="This endpoint requires authentication to be implemented first",
+    from app.schemas.listing_applicants import ListingApplicantCreate
+    
+    application_data = ListingApplicantCreate(
+        listing_id=listing_id,
+        applicant_uid=applicant_uid,
+        message=message,
     )
+    
+    try:
+        result = await crud.create_application(application_data)
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to create application",
+            )
+        return result
+    except Exception as e:
+        # Handle database trigger errors (e.g., poster applying to own listing)
+        error_msg = str(e)
+        if "poster_cannot_apply" in error_msg.lower() or "cannot apply to own listing" in error_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Poster cannot apply to their own listing",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to apply: {error_msg}",
+        )
 
 
 @router.get(

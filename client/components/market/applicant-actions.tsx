@@ -33,12 +33,12 @@ export default function ApplicantActions({ listingId, applicantUid, currentUserI
   async function updateStatus(newStatus: "shortlisted" | "rejected") {
     setLoading(true);
     try {
+      const endpoint = newStatus === "shortlisted" ? "shortlist" : "reject";
       const res = await fetch(
-        `${baseUrl}/api/v1/listings/${encodeURIComponent(listingId)}/applicants/${encodeURIComponent(applicantUid)}?user_uid=${encodeURIComponent(String(currentUserId))}`,
+        `${baseUrl}/api/v1/listings/${encodeURIComponent(listingId)}/applicants/${encodeURIComponent(applicantUid)}/${endpoint}`,
         {
-          method: "PATCH",
+          method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: newStatus }),
         },
       );
       if (!res.ok) {

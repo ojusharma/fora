@@ -27,11 +27,10 @@ export default function WithdrawButton({ listingId, currentUserId }: Props) {
     setLoading(true);
     try {
       const res = await fetch(
-        `${baseUrl}/api/v1/listings/${encodeURIComponent(listingId)}/applicants/${encodeURIComponent(currentUserId)}?user_uid=${encodeURIComponent(currentUserId)}`,
+        `${baseUrl}/api/v1/listings/${encodeURIComponent(listingId)}/applicants/${encodeURIComponent(currentUserId)}/withdraw`,
         {
-          method: "PATCH",
+          method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "withdrawn" }),
         },
       );
       if (!res.ok) {
