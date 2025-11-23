@@ -41,43 +41,57 @@ export function NotificationBell() {
       </PopoverTrigger>
 
       <PopoverContent
-        align="end"
-        className="w-80 p-4 shadow-lg rounded-lg border bg-popover"
+  align="end"
+  className="
+    w-80 p-4 rounded-lg border
+    bg-popover text-popover-foreground 
+    shadow-md 
+    dark:bg-neutral-900 dark:text-neutral-100 dark:border-neutral-700
+  "
+>
+  <h3 className="text-sm font-semibold mb-3">Notifications</h3>
+
+  {notifications.length === 0 && (
+    <p className="text-xs text-muted-foreground dark:text-neutral-400">
+      No notifications
+    </p>
+  )}
+
+  <ul className="max-h-72 overflow-y-auto space-y-2">
+    {notifications.map((n) => (
+      <li
+        key={n.id}
+        className={`
+          p-3 rounded border cursor-pointer transition
+          ${n.is_read
+            ? "bg-gray-50 border-gray-200 dark:bg-neutral-800 dark:border-neutral-700"
+            : "bg-blue-50 border-blue-200 dark:bg-blue-900/40 dark:border-blue-800"
+          }
+        `}
+        onClick={() => markAsRead(n.id)}
       >
-        <h3 className="text-sm font-semibold mb-3">Notifications</h3>
+        <p className="text-sm mb-1">{n.body}</p>
 
-        {notifications.length === 0 && (
-          <p className="text-xs text-muted-foreground">No notifications</p>
+        <p className="text-[10px] text-muted-foreground dark:text-neutral-400 mb-2">
+          {new Date(n.created_at).toLocaleString()}
+        </p>
+
+        {n.metadata?.redirect_url && (
+          <Link
+            href={n.metadata.redirect_url}
+            className="
+              text-xs font-medium text-blue-600 hover:underline
+              dark:text-blue-400
+            "
+          >
+            View listing →
+          </Link>
         )}
-
-        <ul className="max-h-72 overflow-y-auto space-y-2">
-          {notifications.map((n) => (
-            <li
-              key={n.id}
-              className={`p-3 rounded border cursor-pointer transition ${
-                n.is_read ? "bg-gray-50" : "bg-blue-50 border-blue-200"
-              }`}
-              onClick={() => markAsRead(n.id)}
-            >
-              <p className="text-sm mb-1">{n.body}</p>
-
-              <p className="text-[10px] text-muted-foreground mb-2">
-                {new Date(n.created_at).toLocaleString()}
-              </p>
-
-              {/** Redirect URL */}
-              {n.metadata?.redirect_url && (
-                <Link
-                  href={n.metadata.redirect_url}
-                  className="text-xs font-medium text-blue-600 hover:underline"
-                >
-                  View listing →
-                </Link>
-              )}
-            </li>
-          ))}
-        </ul>
-      </PopoverContent>
+      </li>
+    ))}
+  </ul>
+</PopoverContent>
+ 
     </Popover>
   );
 }

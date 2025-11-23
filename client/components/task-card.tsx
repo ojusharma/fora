@@ -3,15 +3,15 @@ import { Badge } from "@/components/ui/badge"
 import { MapPin, DollarSign, User } from "lucide-react"
 
 interface Task {
-  id: number
+  id: string | number
   title: string
   description: string
-  reward: string
-  location: string
-  timeAgo: string
-  category: string
-  postedBy: string
-  coverImage: string
+  reward?: string
+  location?: string
+  timeAgo?: string
+  category?: string
+  postedBy?: string
+  coverImage?: string
 }
 
 interface TaskCardProps {
