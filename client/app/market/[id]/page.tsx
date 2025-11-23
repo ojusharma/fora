@@ -12,6 +12,7 @@ import WithdrawButton from "../../../components/market/withdraw-button";
 import { ListingDetailTracker } from "@/components/market/listing-detail-tracker";
 import { createClient } from "@/lib/supabase/client";
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+import { NotificationBell } from "@/components/notification-bell";
 
 const mapContainerStyle = { width: "100%", height: "300px" };
 
@@ -170,10 +171,15 @@ export default function Page() {
             <div className="flex gap-5 items-center font-semibold">
               <Link href={"/"}>fora</Link>
               <Link href={"/market"}>marketplace</Link>
+              <Link href={"/chats"}>my chats</Link>
             </div>
-            <Suspense>
-              <AuthButton />
-            </Suspense>
+            <div className="flex items-center gap-4">
+  <Suspense>
+    <NotificationBell />
+  </Suspense>
+
+  <AuthButton />
+</div>
           </div>
         </nav>
         <div className="flex-1 flex flex-col gap-8 w-full max-w-3xl p-5">

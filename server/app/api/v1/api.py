@@ -13,6 +13,9 @@ from app.api.v1.endpoints import (
     user_stats,
     user_preferences,
     listing_applicants,
+    chats,
+    notifications,
+    ratings,
 )
 from app.api.v1 import admin
 
@@ -35,4 +38,11 @@ api_router.include_router(user_stats.router, prefix="/users", tags=["user-stats"
 api_router.include_router(
     user_preferences.router, prefix="/users", tags=["user-preferences"]
 )
+api_router.include_router(ratings.router, prefix="/ratings", tags=["ratings"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+
+# chats
+api_router.include_router(chats.router, prefix="/chats", tags=["chats"])
+
+api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+ 

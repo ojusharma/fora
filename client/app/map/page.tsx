@@ -3,7 +3,7 @@ console.log("MAP PAGE MOUNTED");
 
 import { AuthButton } from "@/components/auth-button";
 import Link from "next/link";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
+import { NotificationBell } from "@/components/notification-bell";
 
 type Listing = {
   id: string;
@@ -334,7 +335,13 @@ export default function MapPage() {
             <Link href="/map">map</Link>
             <Link href="/chats">chats</Link>
           </div>
-          <AuthButton />
+          <div className="flex items-center gap-4">
+            <Suspense>
+              <NotificationBell />
+            </Suspense>
+          
+            <AuthButton />
+          </div>
         </div>
       </nav>
 

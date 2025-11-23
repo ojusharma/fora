@@ -49,6 +49,8 @@ class UserProfileResponse(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     display_name: Optional[str] = None
+    user_rating: Optional[float] = None
+    no_ratings: Optional[int] = 0
 
     class Config:
         orm_mode = True

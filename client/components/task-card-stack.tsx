@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { TaskCard } from "./task-card"
 import { X, Check, RotateCcw, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -89,7 +89,15 @@ export function TaskCardStack({
   onApply?: (id: string | number) => Promise<void> | void
   onIgnore?: (id: string | number) => Promise<void> | void
 }) {
+  
   const [tasks, setTasks] = useState<Task[]>(initialTasks ?? sampleTasks)
+  console.log(tasks);
+  useEffect(() => {
+  if (initialTasks) {
+    setTasks(initialTasks);
+  }
+}, [initialTasks]);
+
   const [currentIndex, setCurrentIndex] = useState(0)
   const [direction, setDirection] = useState<"left" | "right" | null>(null)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
@@ -257,16 +265,6 @@ export function TaskCardStack({
       </div>
 
       <div className="flex items-center justify-center gap-4">
-        <Button
-          size="lg"
-          variant="outline"
-          className="h-14 w-14 rounded-full border-2 hover:scale-110 transition-transform bg-white shadow-md"
-          onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
-          disabled={currentIndex === 0}
-        >
-          <RotateCcw className="h-6 w-6 text-yellow-500" />
-          <span className="sr-only">Undo</span>
-        </Button>
 
         <Button
           size="lg"
@@ -278,14 +276,19 @@ export function TaskCardStack({
           <span className="sr-only">Ignore</span>
         </Button>
 
-        <Button
-          size="lg"
-          className="h-14 w-14 rounded-full hover:scale-110 transition-transform bg-blue-500 hover:bg-blue-600 text-white shadow-lg"
-        >
-          <Star className="h-6 w-6 fill-current" />
-          <span className="sr-only">Super Apply</span>
-        </Button>
 
+
+        
+           <Button
+          size="lg"
+          variant="outline"
+          className="h-14 w-14 rounded-full border-2 hover:scale-110 transition-transform bg-white shadow-md"
+          onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
+          disabled={currentIndex === 0}
+        >
+          <RotateCcw className="h-6 w-6 text-yellow-500" />
+          <span className="sr-only">Undo</span>
+        </Button>
         <Button
           size="lg"
           className="h-16 w-16 rounded-full hover:scale-110 transition-transform bg-green-500 hover:bg-green-600 text-white shadow-lg"
@@ -294,15 +297,7 @@ export function TaskCardStack({
           <Check className="h-8 w-8 stroke-[3]" />
           <span className="sr-only">Apply</span>
         </Button>
-
-        <Button
-          size="lg"
-          variant="outline"
-          className="h-14 w-14 rounded-full border-2 hover:scale-110 transition-transform bg-white shadow-md"
-        >
-          <Star className="h-6 w-6 text-purple-500" />
-          <span className="sr-only">Boost</span>
-        </Button>
+       
       </div>
 
       <div className="text-center mt-6 text-sm text-muted-foreground">

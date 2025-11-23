@@ -80,3 +80,6 @@ __all__ = [
     "AdminStats",
     "AdminUserStats",
 ]
+
+from .notification import NotificationBase, NotificationCreate, NotificationOut
+

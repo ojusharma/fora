@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import { AuthButton } from "@/components/auth-button";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { Button } from "@/components/ui/button";
+import { NotificationBell } from "@/components/notification-bell";
 
 interface UserProfile {
   uid: string;
@@ -56,9 +57,13 @@ export default async function EditProfilePage() {
               <Link href={"/chats"}>chats</Link>
               <Link href={"/profile"}>profile</Link>
             </div>
-            <Suspense>
-              <AuthButton />
-            </Suspense>
+            <div className="flex items-center gap-4">
+  <Suspense>
+    <NotificationBell />
+  </Suspense>
+
+  <AuthButton />
+</div>
           </div>
         </nav>
 

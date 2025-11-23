@@ -4,8 +4,17 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, CheckCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { MessageSquare, CheckCircle, Star } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 interface Task {
@@ -19,12 +28,21 @@ interface Task {
     compensation?: number;
     deadline?: string;
     location_address?: string;
+    poster_uid?: string;
   };
 }
 
 export function TasksInProgress() {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showThankYouDialog, setShowThankYouDialog] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [posterName, setPosterName] = useState<string>("the poster");
+  const [rating, setRating] = useState(0);
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function loadShortlistedTasks() {
@@ -40,16 +58,18 @@ export function TasksInProgress() {
         const uid = data.user.id;
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
-        // Fetch user's applications with status "shortlisted"
-        const response = await fetch(
-          `${baseUrl}/api/v1/listings/user/${uid}/with-listings?status=shortlisted`,
-          { cache: "no-store" }
-        );
+        // Fetch user's applications with status "shortlisted" and "pending_confirmation"
+        const [shortlistedRes, pendingRes] = await Promise.all([
+          fetch(`${baseUrl}/api/v1/listings/user/${uid}/with-listings?status=shortlisted`, { cache: "no-store" }),
+          fetch(`${baseUrl}/api/v1/listings/user/${uid}/with-listings?status=pending_confirmation`, { cache: "no-store" })
+        ]);
 
-        console.log("Tasks in Progress API response status:", response.status);
+        console.log("Tasks in Progress API response status:", shortlistedRes.status, pendingRes.status);
 
-        if (response.ok) {
-          const applications = await response.json();
+        if (shortlistedRes.ok || pendingRes.ok) {
+          const shortlisted = shortlistedRes.ok ? await shortlistedRes.json() : [];
+          const pending = pendingRes.ok ? await pendingRes.json() : [];
+          const applications = [...shortlisted, ...pending];
           console.log("Tasks in Progress data:", applications);
           
           // Filter to ensure we have the listing data
@@ -64,7 +84,7 @@ export function TasksInProgress() {
           console.log("Normalized tasks:", normalizedTasks);
           setTasks(normalizedTasks);
         } else {
-          console.error("Failed to fetch tasks:", response.status, await response.text());
+          console.error("Failed to fetch tasks");
         }
       } catch (err) {
         console.error("Failed to load tasks in progress:", err);
@@ -75,6 +95,111 @@ export function TasksInProgress() {
 
     loadShortlistedTasks();
   }, []);
+
+  const handleMarkComplete = async (task: Task) => {
+    setSelectedTask(task);
+    
+    // Fetch poster's name
+    if (task.listing?.poster_uid) {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+        const response = await fetch(`${baseUrl}/api/v1/users/${task.listing.poster_uid}`, {
+          cache: "no-store"
+        });
+        
+        if (response.ok) {
+          const profile = await response.json();
+          setPosterName(profile.display_name || profile.phone || "the poster");
+        }
+      } catch (err) {
+        console.error("Failed to fetch poster name:", err);
+        setPosterName("the poster");
+      }
+    }
+    
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmYes = () => {
+    setShowConfirmDialog(false);
+    setShowThankYouDialog(true);
+  };
+
+  const handleConfirmNo = () => {
+    setShowConfirmDialog(false);
+    setSelectedTask(null);
+  };
+
+  const handleRatingSubmit = async () => {
+    if (!selectedTask?.listing_id) return;
+
+    try {
+      const supabase = createClient();
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData?.user) return;
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+      
+      // Submit rating to backend 
+      if (rating > 0) {
+        const ratingResponse = await fetch(
+          `${baseUrl}/api/v1/ratings/poster`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              listing_id: selectedTask.listing_id,
+              applicant_uid: userData.user.id,
+              rating: rating
+            })
+          }
+        );
+
+        if (ratingResponse.ok) {
+          const result = await ratingResponse.json();
+          console.log("Rating submitted successfully:", result);
+        } else {
+          console.error("Failed to submit rating");
+        }
+      }
+      
+      // Update applicant status to pending_confirmation
+      const statusResponse = await fetch(
+        `${baseUrl}/api/v1/listings/${selectedTask.listing_id}/applicants/${userData.user.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "pending_confirmation" })
+        }
+      );
+
+      if (statusResponse.ok) {
+        console.log("Status updated to pending_confirmation");
+        
+        // Update the task in the local state
+        setTasks(prev => prev.map(t => 
+          t.listing_id === selectedTask.listing_id 
+            ? { ...t, status: "pending_confirmation" }
+            : t
+        ));
+        
+        // Navigate to profile page
+        router.push("/profile");
+      }
+    } catch (err) {
+      console.error("Failed to update status:", err);
+    }
+    
+    setShowThankYouDialog(false);
+    setSelectedTask(null);
+    setRating(0);
+  };
+
+  const handleExit = () => {
+    setShowThankYouDialog(false);
+    setSelectedTask(null);
+    setRating(0);
+  };
 
   if (isLoading) {
     return (
@@ -105,16 +230,18 @@ export function TasksInProgress() {
         {tasks.map((task) => {
           const listing = task.listing;
           if (!listing) return null;
+          
+          const isPendingConfirmation = task.status === "pending_confirmation";
 
           return (
-            <Card key={task.listing_id} className="flex flex-col">
+            <Card key={task.listing_id} className={`flex flex-col ${isPendingConfirmation ? 'opacity-50' : ''}`}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="text-lg line-clamp-1">
                     {listing.name}
                   </CardTitle>
-                  <Badge variant="outline" className="shrink-0 text-xs">
-                    Shortlisted
+                  <Badge variant={isPendingConfirmation ? "secondary" : "outline"} className="shrink-0 text-xs">
+                    {isPendingConfirmation ? "Pending Confirmation" : "Shortlisted"}
                   </Badge>
                 </div>
                 {listing.compensation && (
@@ -163,17 +290,23 @@ export function TasksInProgress() {
                   </Button>
                 </div>
 
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="w-full flex items-center gap-2 mt-2"
-                  onClick={() => {
-                    console.log("Mark as complete:", listing.id);
-                  }}
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  Mark as Complete
-                </Button>
+                {isPendingConfirmation ? (
+                  <div className="w-full p-3 mt-2 bg-muted rounded-md text-center">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Waiting for poster confirmation
+                    </p>
+                  </div>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="w-full flex items-center gap-2 mt-2"
+                    onClick={() => handleMarkComplete(task)}
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    Mark as Complete
+                  </Button>
+                )}
 
                 <p className="text-xs text-muted-foreground mt-2">
                   Applied {new Date(task.applied_at).toLocaleDateString()}
@@ -183,6 +316,73 @@ export function TasksInProgress() {
           );
         })}
       </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark Task as Complete?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to mark this task as complete?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={handleConfirmNo}>
+              No
+            </Button>
+            <Button onClick={handleConfirmYes}>
+              Yes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showThankYouDialog} onOpenChange={setShowThankYouDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Thank You!</DialogTitle>
+            <DialogDescription>
+              The poster will confirm completion. Please rate your experience working with {posterName}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm font-medium mb-3">Rate the poster:</p>
+            <div className="flex gap-2 justify-center">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setRating(star)}
+                  onMouseEnter={() => setHoveredRating(star)}
+                  onMouseLeave={() => setHoveredRating(0)}
+                  className="focus:outline-none transition-transform hover:scale-110"
+                >
+                  <Star
+                    className={`h-8 w-8 ${
+                      star <= (hoveredRating || rating)
+                        ? "fill-yellow-400 text-yellow-400"
+                        : "text-gray-300"
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+            {rating > 0 && (
+              <p className="text-center text-sm text-muted-foreground mt-2">
+                {rating} {rating === 1 ? "star" : "stars"}
+              </p>
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={handleExit}>
+              Exit
+            </Button>
+            <Button onClick={handleRatingSubmit} disabled={rating === 0}>
+              Submit Rating
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

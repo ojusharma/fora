@@ -84,18 +84,32 @@ export const RealtimeChat = ({
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000'
         const listingId = roomName.startsWith('listing-') ? roomName.replace('listing-', '') : roomName
         if (listingId && currentUserId) {
+          // log attempt
+          // eslint-disable-next-line no-console
+          console.debug('[RealtimeChat] persisting message', { listingId, user: currentUserId, content: newMessage })
+
           const resp = await fetch(`${baseUrl}/api/v1/chats/${encodeURIComponent(listingId)}/messages?user_uid=${encodeURIComponent(currentUserId)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: newMessage }),
           })
+
           if (!resp.ok) {
             const text = await resp.text().catch(() => null)
-            console.error('persist message failed', resp.status, text)
+            // eslint-disable-next-line no-console
+            console.error('[RealtimeChat] persist message failed', resp.status, text)
+          } else {
+            const body = await resp.json().catch(() => null)
+            // eslint-disable-next-line no-console
+            console.debug('[RealtimeChat] persist message success', body)
           }
+        } else {
+          // eslint-disable-next-line no-console
+          console.debug('[RealtimeChat] skipping persist - missing listingId or currentUserId', { listingId, currentUserId })
         }
       } catch (err) {
-        console.error('persist message error', err)
+        // eslint-disable-next-line no-console
+        console.error('[RealtimeChat] persist message error', err)
       }
 
       setNewMessage('')

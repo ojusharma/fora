@@ -6,6 +6,7 @@ import { MarketSkeleton } from "@/components/market/market-skeleton";
 import Link from "next/link";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { NotificationBell } from "@/components/notification-bell";
 
 export default async function MarketPage() {
   const supabase = await createClient();
@@ -29,9 +30,13 @@ export default async function MarketPage() {
               <Link href={"/map"}>map</Link>
               <Link href="/chats">chats</Link>
             </div>
-            <Suspense>
-              <AuthButton />
-            </Suspense>
+            <div className="flex items-center gap-4">
+  <Suspense>
+    <NotificationBell />
+  </Suspense>
+
+  <AuthButton />
+</div>
           </div>
         </nav>
 

@@ -198,4 +198,3 @@ class ListingCRUD:
         )
         return bool(response.data)
 
-

@@ -45,11 +45,6 @@ export function TaskCard({ task }: TaskCardProps) {
             </div>
 
             <div className="flex items-center gap-2 bg-white/20 backdrop-blur-md rounded-full px-4 py-2">
-              <MapPin className="h-4 w-4 text-white" />
-              <span className="text-sm font-medium text-white">{task.location}</span>
-            </div>
-
-            <div className="flex items-center gap-2 bg-white/20 backdrop-blur-md rounded-full px-4 py-2">
               <User className="h-4 w-4 text-white" />
               <span className="text-sm font-medium text-white">{task.postedBy}</span>
             </div>

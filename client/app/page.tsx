@@ -6,6 +6,8 @@ import { TasksInProgress } from "@/components/tasks-in-progress";
 import { AdminLink } from "@/components/admin-link";
 import Link from "next/link";
 import { Suspense } from "react";
+import { NotificationBell } from "@/components/notification-bell";
+
 
 export default async function Home() {
   const supabase = await createClient();
@@ -21,10 +23,23 @@ export default async function Home() {
               <Link href={"/market"}>marketplace</Link>
               <Link href={"/map"}>map</Link>
               <AdminLink />
+              {process.env.NODE_ENV === "development" && (
+                <Link
+                  href={"/ml-admin"}
+                  className="text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 rounded"
+                >
+                  🔧 ML Admin
+                </Link>
+              )}
+              <Link href={"/chats"}>my chats</Link>
             </div>
-            <Suspense>
-              <AuthButton />
-            </Suspense>
+            <div className="flex items-center gap-4">
+  <Suspense>
+    <NotificationBell />
+  </Suspense>
+
+  <AuthButton />
+</div>
           </div>
         </nav>
         <div className="flex-1 flex flex-col gap-12 max-w-6xl w-full p-5">

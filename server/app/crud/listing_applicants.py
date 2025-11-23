@@ -5,6 +5,7 @@ CRUD operations for listing_applicants table.
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import datetime
+from app.crud.listing import ListingCRUD
 from supabase import Client
 
 from app.schemas.listing_applicants import (
@@ -23,6 +24,22 @@ class ListingApplicantsCRUD:
         self.supabase = supabase
 
     # ==================== APPLICANT OPERATIONS ====================
+
+    async def _send_notification(self, user_uid: str, message: str, redirect_url: str):
+        from app.crud.notification import NotificationCRUD
+        from app.schemas.notification import NotificationCreate
+
+        notif = NotificationCRUD(self.supabase)
+
+        await notif.create_notification(
+            NotificationCreate(
+                user_uid=user_uid,
+                title=message,
+                body=message,  # ← REQUIRED
+                redirect_url=redirect_url,
+            )
+)
+
 
     async def create_application(
         self, application: ListingApplicantCreate
@@ -49,6 +66,7 @@ class ListingApplicantsCRUD:
             .insert(application_data)
             .execute()
         )
+        
         return response.data[0] if response.data else None
 
     async def get_application(
@@ -146,6 +164,14 @@ class ListingApplicantsCRUD:
             .eq("applicant_uid", str(applicant_uid))
             .execute()
         )
+        listing = await ListingCRUD(self.supabase).get_listing(listing_id)
+
+        # Notify poster (listing owner)
+        await self._send_notification(
+            user_uid=str(listing["poster_uid"]),
+            message=f"An applicant withdrew from your listing '{listing['name']}'.",
+            redirect_url=f"/market/{listing_id}"
+)
         return len(response.data) > 0 if response.data else False
 
     async def get_listing_applicants(
@@ -352,39 +378,68 @@ class ListingApplicantsCRUD:
             listing_id, applicant_uid, ApplicantStatus.WITHDRAWN
         )
 
-    async def shortlist_applicant(
-        self, listing_id: UUID, applicant_uid: UUID
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Shortlist an applicant.
-        
-        Args:
-            listing_id: Listing ID
-            applicant_uid: Applicant user ID
-            
-        Returns:
-            Updated application data or None if not found
-        """
-        return await self.update_status(
-            listing_id, applicant_uid, ApplicantStatus.SHORTLISTED
+    async def shortlist_applicant(self, listing_id: UUID, applicant_uid: UUID):
+            # Find existing application
+            result = await self.get_application(listing_id, applicant_uid)
+            if not result:
+                return None
+
+            # Update application status
+            updated = (
+                self.supabase.table("listing_applicants")
+                .update({"status": "shortlisted"})
+                .eq("listing_id", str(listing_id))
+                .eq("applicant_uid", str(applicant_uid))
+                .execute()
+            )
+
+            if not updated.data:
+                return None
+
+            # ⭐ Assign shortlisted applicant to the listing
+            self.supabase.table("listings").update({
+                "assignee_uid": str(applicant_uid)
+            }).eq("id", str(listing_id)).execute()
+
+            # Load listing
+            listing = await ListingCRUD(self.supabase).get_listing(listing_id)
+
+            # Notify applicant
+            await self._send_notification(
+                user_uid=str(applicant_uid),
+                message=f"Your application for '{listing['name']}' was shortlisted.",
+                redirect_url=f"/market/{listing_id}"
+            )
+
+            return updated.data[0]
+
+
+    async def reject_applicant(self, listing_id: UUID, applicant_uid: UUID):
+        result = await self.get_application(listing_id, applicant_uid)
+        if not result:
+            return None
+
+        updated = (
+            self.supabase.table("listing_applicants")
+            .update({"status": "rejected"})
+            .eq("listing_id", str(listing_id))
+            .eq("applicant_uid", str(applicant_uid))
+            .execute()
         )
 
-    async def reject_applicant(
-        self, listing_id: UUID, applicant_uid: UUID
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Reject an applicant.
-        
-        Args:
-            listing_id: Listing ID
-            applicant_uid: Applicant user ID
-            
-        Returns:
-            Updated application data or None if not found
-        """
-        return await self.update_status(
-            listing_id, applicant_uid, ApplicantStatus.REJECTED
+        if not updated.data:
+            return None
+
+        listing = await ListingCRUD(self.supabase).get_listing(listing_id)
+
+        await self._send_notification(
+            user_uid=str(applicant_uid),
+            message=f"Your application for '{listing['name']}' was rejected.",
+            redirect_url=f"/market/{listing_id}"
         )
+
+        return updated.data[0]
+
 
     async def get_applications_by_filters(
         self, filters: ApplicantFilters
