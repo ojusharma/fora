@@ -11,6 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 
 type Listing = {
@@ -22,6 +28,7 @@ type Listing = {
   location_address: string | null;
   compensation: number;
   status: string;
+  tags?: number[];
 };
 
 const mapContainerStyle = { width: "100%", height: "100%" };
@@ -63,6 +70,8 @@ export default function MapPage() {
   const [radiusCenter, setRadiusCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [isGeocodingLocation, setIsGeocodingLocation] = useState(false);
   const [isGeocodingRadius, setIsGeocodingRadius] = useState(false);
+  const [selectedFilterTags, setSelectedFilterTags] = useState<number[]>([]);
+  const [availableTags, setAvailableTags] = useState<Array<{ id: number; name: string }>>([]);
 
   const cachedListings = useRef<Listing[] | null>(null);
 
@@ -85,6 +94,21 @@ export default function MapPage() {
       setIsAuthChecked(true);
     }
     checkAuth();
+
+    // Fetch available tags
+    async function fetchTags() {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+        const response = await fetch(`${baseUrl}/api/v1/tags`);
+        if (response.ok) {
+          const tags = await response.json();
+          setAvailableTags(tags);
+        }
+      } catch (error) {
+        console.error("Failed to fetch tags:", error);
+      }
+    }
+    fetchTags();
   }, [router]);
 
   useEffect(() => {
@@ -236,12 +260,19 @@ export default function MapPage() {
           listing.longitude
         );
         
-        // Convert to miles if needed (1 km = 0.621371 mi)
         const distanceInUnit = unit?.toLowerCase() === 'mi' ? distance * 0.621371 : distance;
         
         if (distanceInUnit > radius) {
           return false;
         }
+      }
+    }
+
+    if (selectedFilterTags.length > 0) {
+      const listingTags = listing.tags || [];
+      const hasMatchingTag = selectedFilterTags.some(tagId => listingTags.includes(tagId));
+      if (!hasMatchingTag) {
+        return false;
       }
     }
 
@@ -255,9 +286,19 @@ export default function MapPage() {
     setLocationCenter(null);
     setRadiusFilter("");
     setRadiusCenter(null);
+    setSelectedFilterTags([]);
   };
 
-  // Pan to first filtered listing when filters change
+  const toggleFilterTag = (tagId: number) => {
+    setSelectedFilterTags(prev =>
+      prev.includes(tagId)
+        ? prev.filter(id => id !== tagId)
+        : [...prev, tagId]
+    );
+  };
+
+  const hasActiveFilters = nameFilter || locationFilter || radiusFilter || selectedFilterTags.length > 0;
+
   useEffect(() => {
     if (filteredListings.length > 0 && (nameFilter || radiusFilter)) {
       const firstListing = filteredListings[0];
@@ -279,7 +320,6 @@ export default function MapPage() {
   }
 
   const listingsWithCoords = filteredListings;
-  const hasActiveFilters = nameFilter || locationFilter || radiusFilter;
   
   console.log('RENDER - listings:', listings.length, 'filtered:', filteredListings.length, 'isLoaded:', isLoaded);
 
@@ -364,6 +404,49 @@ export default function MapPage() {
                 )}
               </div>
 
+              {availableTags.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Tags</Label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="w-full justify-between">
+                        {selectedFilterTags.length === 0
+                          ? "Select tags..."
+                          : `${selectedFilterTags.length} tag${selectedFilterTags.length > 1 ? 's' : ''} selected`}
+                        <span className="ml-2">▼</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-[400px] max-h-[300px] overflow-y-auto">
+                      {availableTags.map((tag) => (
+                        <DropdownMenuCheckboxItem
+                          key={tag.id}
+                          checked={selectedFilterTags.includes(tag.id)}
+                          onCheckedChange={() => toggleFilterTag(tag.id)}
+                        >
+                          {tag.name}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  {selectedFilterTags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {selectedFilterTags.map((tagId) => {
+                        const tag = availableTags.find((t) => t.id === tagId);
+                        return tag ? (
+                          <Badge
+                            key={tag.id}
+                            variant="default"
+                            className="cursor-pointer"
+                            onClick={() => toggleFilterTag(tag.id)}
+                          >
+                            {tag.name} ×
+                          </Badge>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
             </div>
 
