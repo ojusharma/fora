@@ -6,6 +6,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { usePersonalizedFeed } from "@/hooks/use-personalized-feed";
+import { TaskCardStack } from "./task-card-stack";
 
 type RecommendedListing = {
   id: string;
@@ -21,7 +22,7 @@ type RecommendedListing = {
 export function HomeRecommendations() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
-
+  
   const supabase = createClient();
 
   const {
@@ -32,9 +33,47 @@ export function HomeRecommendations() {
   } = usePersonalizedFeed({
     limit: 6,
     excludeSeen: false,
-    excludeApplied: false,
+    excludeApplied: true,
     autoFetch: isAuthenticated,
   });
+
+    const [posterNames, setPosterNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    async function loadPosterNames() {
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+      const uids = Array.from(
+        new Set(listings.map((l) => l.poster_uid).filter(Boolean))
+      );
+
+      if (uids.length === 0) return;
+      console.log(uids);
+      const results = await Promise.all(
+        uids.map((uid) =>
+          fetch(`${baseUrl}/api/v1/users/${uid}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null)
+        )
+      );
+
+      const nameMap: Record<string, string> = {};
+      results.forEach((profile) => {
+        if (!profile) return;
+        const uid = profile.uid ?? profile.id;
+        nameMap[uid] =
+          profile.display_name ??
+          profile.full_name ??
+          profile.phone ??
+          String(uid).slice(0, 8);
+      });
+
+      setPosterNames(nameMap);
+      console.log(nameMap);
+    }
+
+    loadPosterNames();
+  }, [listings]);
 
   useEffect(() => {
     async function checkAuth() {
@@ -141,6 +180,54 @@ export function HomeRecommendations() {
     );
   }
 
+
+  async function handleApply(listingId: string | number) {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+  const supabase = createClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data?.user) return;
+
+  const uid = data.user.id;
+
+  // 1. Call your real apply endpoint
+  await fetch(
+    `${baseUrl}/api/v1/listings/${listingId}/applicants/${uid}/apply`,
+    {
+      method: "POST",
+    }
+  );
+
+  // 2. Track interaction (optional but recommended)
+  await fetch(
+    `${baseUrl}/api/v1/feed/interactions/${listingId}?user_uid=${uid}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ interaction_type: "apply" }),
+    }
+  );
+}
+
+
+async function handleIgnore(listingId: string | number) {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+  const { data } = await supabase.auth.getUser();
+  if (!data?.user) return;
+
+  const uid = data.user.id;
+
+  // Track "dismiss"
+  await fetch(`${baseUrl}/api/v1/feed/interactions/${listingId}?user_uid=${uid}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ interaction_type: "dismiss" }),
+  });
+
+  // Removing from stack happens automatically inside TaskCardStack
+}
+
   return (
     <div className="w-full py-8 space-y-4">
       <div className="flex items-center justify-between">
@@ -155,64 +242,20 @@ export function HomeRecommendations() {
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {listings.slice(0, 6).map((listing) => (
-          <Link
-            key={listing.id}
-            href={`/market/${listing.id}`}
-            onClick={() => trackClick(listing.id)}
-            className="block"
-          >
-            <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-full">
-              {listing.images && listing.images.length > 0 ? (
-                <div className="h-32 bg-muted overflow-hidden">
-                  <img
-                    src={listing.images[0]}
-                    alt={listing.name}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="h-32 bg-gradient-to-br from-emerald-500/80 via-sky-500/80 to-indigo-500/80" />
-              )}
-              <CardContent className="p-4 space-y-2">
-                <p className="text-sm font-semibold line-clamp-2">
-                  {listing.name}
-                </p>
-                {listing.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {listing.description}
-                  </p>
-                )}
-                {listing.recommendation_score !== undefined && (
-                  <div className="pt-1">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full transition-all"
-                          style={{
-                            width: `${Math.min(listing.recommendation_score * 100, 100)}%`,
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {Math.round(listing.recommendation_score * 100)}% match
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-              <CardFooter className="px-4 pb-4 pt-0 text-xs">
-                {listing.compensation && (
-                  <span className="text-sm font-semibold">
-                    From {listing.currency || "USD"}{" "}
-                    {Number(listing.compensation).toLocaleString()}
-                  </span>
-                )}
-              </CardFooter>
-            </Card>
-          </Link>
-        ))}
+      <div>
+        <TaskCardStack
+  tasks={listings.map(l => ({
+    id: l.id,                     // the actual UUID
+    title: l.name,
+    description: l.description,
+    reward: `${l.currency} ${l.compensation ?? ""}`,
+    location: l.location_address,
+    postedBy: l.poster_uid ? posterNames[l.poster_uid] : "Unknown",
+    coverImage: l.images?.[0] ?? "/placeholder.svg",
+  }))}
+  onApply={handleApply}
+  onIgnore={handleIgnore}
+/>
       </div>
 
       <div className="text-center pt-4">
