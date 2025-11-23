@@ -284,11 +284,6 @@ export function PostedTasksInProgress() {
                     {isPendingConfirmation ? "Pending Review" : "In Progress"}
                   </Badge>
                 </div>
-                {task.compensation && (
-                  <CardDescription className="font-medium text-red-600">
-                    -{task.compensation.toLocaleString()} credits
-                  </CardDescription>
-                )}
               </CardHeader>
               <CardContent className="flex-1 flex flex-col gap-4">
                 {isPendingConfirmation && (
