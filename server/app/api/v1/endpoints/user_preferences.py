@@ -70,7 +70,7 @@ async def add_preferences_bulk(
 
 
 @router.get(
-    "/user/{user_id}",
+    "/{user_id}/preferences",
     response_model=List[UserPreferenceResponse],
     summary="Get user preferences",
 )
@@ -84,7 +84,7 @@ async def get_user_preferences(
 
 
 @router.get(
-    "/user/{user_id}/with-tags",
+    "/{user_id}/preferences/with-tags",
     response_model=List[dict],
     summary="Get user preferences with tag details",
 )
@@ -98,7 +98,7 @@ async def get_user_preferences_with_tags(
 
 
 @router.get(
-    "/user/{user_id}/tag-ids",
+    "/{user_id}/preferences/tag-ids",
     response_model=List[int],
     summary="Get user's preferred tag IDs",
 )
@@ -112,7 +112,7 @@ async def get_user_tag_ids(
 
 
 @router.get(
-    "/user/{user_id}/has/{tag_id}",
+    "/{user_id}/preferences/has/{tag_id}",
     response_model=bool,
     summary="Check if user has tag preference",
 )
@@ -127,7 +127,7 @@ async def has_preference(
 
 
 @router.delete(
-    "/user/{user_id}/tag/{tag_id}",
+    "/{user_id}/preferences/{tag_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Remove a tag preference",
 )
@@ -146,7 +146,7 @@ async def remove_preference(
 
 
 @router.delete(
-    "/user/{user_id}",
+    "/{user_id}/preferences",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Remove all user preferences",
 )
@@ -164,7 +164,7 @@ async def remove_all_preferences(
 
 
 @router.put(
-    "/user/{user_id}",
+    "/{user_id}/preferences",
     response_model=List[UserPreferenceResponse],
     summary="Set user preferences (replace all)",
 )

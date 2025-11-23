@@ -11,8 +11,6 @@ from app.schemas.listing import (
     ListingCreate,
     ListingUpdate,
     ListingFilters,
-    ApplicantCreate,
-    ApplicantUpdate,
 )
 
 
@@ -41,12 +39,27 @@ class ListingCRUD:
         listing_data = listing.model_dump()
         listing_data["poster_uid"] = str(poster_uid)
         
+        # Extract tags before inserting listing
+        tags = listing_data.pop("tags", [])
+        
         # Convert datetime to ISO string
         if listing_data.get("deadline"):
             listing_data["deadline"] = listing_data["deadline"].isoformat()
 
         response = self.supabase.table("listings").insert(listing_data).execute()
-        return response.data[0] if response.data else None
+        created_listing = response.data[0] if response.data else None
+        
+        # Insert tags into listing_tags table
+        if created_listing and tags:
+            listing_id = created_listing["id"]
+            tag_entries = [
+                {"listing_id": listing_id, "tag_id": tag_id}
+                for tag_id in tags
+            ]
+            self.supabase.table("listing_tags").insert(tag_entries).execute()
+            created_listing["tags"] = tags
+        
+        return created_listing
 
     async def get_listing(self, listing_id: UUID) -> Optional[Dict[str, Any]]:
         """
@@ -64,7 +77,19 @@ class ListingCRUD:
             .eq("id", str(listing_id))
             .execute()
         )
-        return response.data[0] if response.data else None
+        listing = response.data[0] if response.data else None
+        
+        # Fetch tags for this listing
+        if listing:
+            tags_response = (
+                self.supabase.table("listing_tags")
+                .select("tag_id")
+                .eq("listing_id", str(listing_id))
+                .execute()
+            )
+            listing["tags"] = [tag["tag_id"] for tag in tags_response.data] if tags_response.data else []
+        
+        return listing
 
     async def get_listings(self, filters: ListingFilters) -> List[Dict[str, Any]]:
         """
@@ -173,133 +198,4 @@ class ListingCRUD:
         )
         return bool(response.data)
 
-    # ==================== APPLICANT OPERATIONS ====================
 
-    async def apply_to_listing(
-        self, listing_id: UUID, applicant_uid: UUID, application: ApplicantCreate
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Apply to a listing.
-        
-        Args:
-            listing_id: The listing ID
-            applicant_uid: UID of the applicant
-            application: Application data
-            
-        Returns:
-            Application data or None if failed
-        """
-        # Check if listing exists and is open
-        listing = await self.get_listing(listing_id)
-        if not listing or listing["status"] != "open":
-            return None
-
-        # Check if already applied
-        existing = (
-            self.supabase.table("listing_applicants")
-            .select("*")
-            .eq("listing_id", str(listing_id))
-            .eq("applicant_uid", str(applicant_uid))
-            .execute()
-        )
-        if existing.data:
-            return None
-
-        application_data = {
-            "listing_id": str(listing_id),
-            "applicant_uid": str(applicant_uid),
-            "message": application.message,
-            "status": "applied",
-        }
-
-        response = (
-            self.supabase.table("listing_applicants")
-            .insert(application_data)
-            .execute()
-        )
-        return response.data[0] if response.data else None
-
-    async def get_listing_applicants(
-        self, listing_id: UUID
-    ) -> List[Dict[str, Any]]:
-        """
-        Get all applicants for a listing.
-        
-        Args:
-            listing_id: The listing ID
-            
-        Returns:
-            List of applicants
-        """
-        response = (
-            self.supabase.table("listing_applicants")
-            .select("*")
-            .eq("listing_id", str(listing_id))
-            .order("applied_at", desc=True)
-            .execute()
-        )
-        return response.data if response.data else []
-
-    async def update_applicant_status(
-        self,
-        listing_id: UUID,
-        applicant_uid: UUID,
-        status_update: ApplicantUpdate,
-        poster_uid: UUID,
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Update applicant status (poster only).
-        
-        Args:
-            listing_id: The listing ID
-            applicant_uid: UID of the applicant
-            status_update: New status
-            poster_uid: UID of the poster (for authorization)
-            
-        Returns:
-            Updated applicant data or None if unauthorized
-        """
-        # Check if user is the poster
-        listing = await self.get_listing(listing_id)
-        if not listing or listing["poster_uid"] != str(poster_uid):
-            return None
-
-        update_data = {"status": status_update.status.value}
-
-        response = (
-            self.supabase.table("listing_applicants")
-            .update(update_data)
-            .eq("listing_id", str(listing_id))
-            .eq("applicant_uid", str(applicant_uid))
-            .execute()
-        )
-        
-        # If shortlisted, update listing assignee
-        if status_update.status.value == "shortlisted" and response.data:
-            await self.supabase.table("listings").update({
-                "assignee_uid": str(applicant_uid),
-                "status": "in_progress"
-            }).eq("id", str(listing_id)).execute()
-
-        return response.data[0] if response.data else None
-
-    async def get_user_applications(
-        self, user_uid: UUID
-    ) -> List[Dict[str, Any]]:
-        """
-        Get all applications by a user.
-        
-        Args:
-            user_uid: UID of the user
-            
-        Returns:
-            List of applications
-        """
-        response = (
-            self.supabase.table("listing_applicants")
-            .select("*, listings(*)")
-            .eq("applicant_uid", str(user_uid))
-            .order("applied_at", desc=True)
-            .execute()
-        )
-        return response.data if response.data else []

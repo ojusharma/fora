@@ -20,14 +20,19 @@ api_router = APIRouter()
 
 # Include all endpoint routers
 api_router.include_router(listings.router, prefix="/listings", tags=["listings"])
+
+# Nest applicants under listings for RESTful structure
+api_router.include_router(
+    listing_applicants.router, prefix="/listings", tags=["applicants"]
+)
+
 api_router.include_router(feed.router, prefix="/feed", tags=["feed"])
 api_router.include_router(tags.router, prefix="/tags", tags=["tags"])
 api_router.include_router(user.router, prefix="/users", tags=["users"])
-api_router.include_router(user_stats.router, prefix="/user-stats", tags=["user-stats"])
+
+# Nest user stats and preferences under users for RESTful structure
+api_router.include_router(user_stats.router, prefix="/users", tags=["user-stats"])
 api_router.include_router(
-    user_preferences.router, prefix="/user-preferences", tags=["user-preferences"]
-)
-api_router.include_router(
-    listing_applicants.router, prefix="/applicants", tags=["applicants"]
+    user_preferences.router, prefix="/users", tags=["user-preferences"]
 )
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])

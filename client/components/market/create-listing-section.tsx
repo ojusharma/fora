@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -85,9 +86,20 @@ export function CreateListingSection({
   const [location, setLocation] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationSuggestions, setLocationSuggestions] = useState<Array<{
+    description: string;
+    place_id: string;
+    lat: number;
+    lng: number;
+  }>>([]);
+  const [isGeocodingLocation, setIsGeocodingLocation] = useState(false);
   const [images, setImages] = useState<ListingImage[]>([
     { url: "", alt: "" },
   ]);
+  const [tags, setTags] = useState<number[]>([])
+  const [tagInput, setTagInput] = useState("");
+  const [availableTags, setAvailableTags] = useState<Array<{ id: number; name: string }>>([]);
+  const [filteredTags, setFilteredTags] = useState<Array<{ id: number; name: string }>>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -124,6 +136,21 @@ export function CreateListingSection({
   React.useEffect(() => {
     let mounted = true;
     const supabase = createClient();
+
+    async function fetchAvailableTags() {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+        const response = await fetch(`${baseUrl}/api/v1/tags`);
+        if (response.ok) {
+          const tagsData = await response.json();
+          if (mounted) {
+            setAvailableTags(tagsData);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch tags:", error);
+      }
+    }
 
     async function enrichListings() {
       // get current user id
@@ -189,6 +216,7 @@ export function CreateListingSection({
       }
     }
 
+    fetchAvailableTags();
     enrichListings();
 
     return () => {
@@ -200,6 +228,147 @@ export function CreateListingSection({
     "marketplace",
   );
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Filter tags based on input
+  React.useEffect(() => {
+    if (tagInput.trim()) {
+      const filtered = availableTags.filter(
+        (tag) =>
+          tag.name.toLowerCase().includes(tagInput.toLowerCase()) &&
+          !tags.includes(tag.id)
+      );
+      setFilteredTags(filtered);
+    } else {
+      setFilteredTags([]);
+    }
+  }, [tagInput, availableTags, tags]);
+
+  const addTag = (tagId: number) => {
+    if (!tags.includes(tagId)) {
+      setTags([...tags, tagId]);
+      setTagInput("");
+    }
+  };
+
+  const createAndAddTag = async (tagName: string) => {
+    console.log('createAndAddTag called with:', tagName);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+      
+      // Check if tag already exists (case-insensitive)
+      const existingTag = availableTags.find(
+        (tag) => tag.name.toLowerCase() === tagName.toLowerCase()
+      );
+      
+      console.log('Existing tag check:', existingTag);
+      
+      if (existingTag) {
+        // Tag already exists, just add it
+        if (!tags.includes(existingTag.id)) {
+          setTags([...tags, existingTag.id]);
+        }
+        setTagInput("");
+        return;
+      }
+      
+      // Create new tag
+      console.log('Creating new tag via API...');
+      const response = await fetch(`${baseUrl}/api/v1/tags`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: tagName }),
+      });
+
+      console.log('API response status:', response.status);
+
+      if (response.ok) {
+        const newTag = await response.json();
+        console.log('New tag created:', newTag);
+        setAvailableTags([...availableTags, newTag]);
+        setTags([...tags, newTag.id]);
+        setTagInput("");
+      } else if (response.status === 409) {
+        // Tag exists, fetch it
+        console.log('Tag exists (409), fetching...');
+        const existingResponse = await fetch(`${baseUrl}/api/v1/tags/name/${encodeURIComponent(tagName)}`);
+        if (existingResponse.ok) {
+          const existingTag = await existingResponse.json();
+          console.log('Fetched existing tag:', existingTag);
+          setAvailableTags([...availableTags, existingTag]);
+          setTags([...tags, existingTag.id]);
+          setTagInput("");
+        }
+      }
+    } catch (error) {
+      console.error("Failed to create tag:", error);
+    }
+  };
+
+  const removeTag = (tagId: number) => {
+    setTags(tags.filter((id) => id !== tagId));
+  };
+
+  const getTagName = (tagId: number) => {
+    return availableTags.find((tag) => tag.id === tagId)?.name || "";
+  };
+
+  // Fetch location suggestions from Google Places API
+  const fetchLocationSuggestions = async (input: string) => {
+    if (input.trim().length < 3) {
+      setLocationSuggestions([]);
+      return;
+    }
+
+    setIsGeocodingLocation(true);
+    try {
+      // Use Google Maps Geocoding API instead
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(input)}&key=${apiKey}`,
+        { mode: 'cors' }
+      );
+      const data = await response.json();
+
+      if (data.results && data.results.length > 0) {
+        setLocationSuggestions(
+          data.results.slice(0, 5).map((result: any) => ({
+            description: result.formatted_address,
+            place_id: result.place_id,
+            lat: result.geometry.location.lat,
+            lng: result.geometry.location.lng,
+          }))
+        );
+      } else {
+        setLocationSuggestions([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch location suggestions:", error);
+      setLocationSuggestions([]);
+    } finally {
+      setIsGeocodingLocation(false);
+    }
+  };
+
+  // Select a location suggestion and set coordinates
+  const selectLocation = async (description: string, lat: number, lng: number) => {
+    setLocation(description);
+    setLocationSuggestions([]);
+    setLatitude(lat);
+    setLongitude(lng);
+  };
+
+  // Debounce location input
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (location) {
+        fetchLocationSuggestions(location);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [location]);
 
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -281,7 +450,7 @@ export function CreateListingSection({
         images: images
           .map((image) => image.url.trim())
           .filter((url) => url.length > 0),
-        tags: [] as number[],
+        tags: tags,
         location_address: location.trim() || null,
         latitude: latitude,
         longitude: longitude,
@@ -351,7 +520,10 @@ export function CreateListingSection({
       setLocation("");
       setLatitude(null);
       setLongitude(null);
+      setLocationSuggestions([]);
       setImages([{ url: "", alt: "" }]);
+      setTags([]);
+      setTagInput("");
       setActiveTab("mine");
       setDialogOpen(false);
     } catch (error) {
@@ -400,7 +572,7 @@ export function CreateListingSection({
           </DialogTrigger>
         </div>
 
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>New listing</DialogTitle>
             <DialogDescription>
@@ -450,38 +622,44 @@ export function CreateListingSection({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
-                placeholder="Enter location (e.g., New York, NY)"
-                value={location}
-                onChange={async (e) => {
-                  const value = e.target.value;
-                  setLocation(value);
-                  
-                  // Geocode the location using Google Maps API
-                  if (value.trim().length > 3) {
-                    try {
-                      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-                      const response = await fetch(
-                        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(value)}&key=${apiKey}`
-                      );
-                      const data = await response.json();
-                      
-                      if (data.results && data.results.length > 0) {
-                        const { lat, lng } = data.results[0].geometry.location;
-                        setLatitude(lat);
-                        setLongitude(lng);
-                      }
-                    } catch (error) {
-                      console.error("Failed to geocode location:", error);
+              <Label htmlFor="location">
+                Location
+                {isGeocodingLocation && (
+                  <span className="ml-2 text-xs text-muted-foreground">(searching...)</span>
+                )}
+              </Label>
+              <div className="relative">
+                <Input
+                  id="location"
+                  placeholder="Enter location (e.g., New York, NY)"
+                  value={location}
+                  onChange={(e) => {
+                    setLocation(e.target.value);
+                    if (!e.target.value.trim()) {
+                      setLocationSuggestions([]);
+                      setLatitude(null);
+                      setLongitude(null);
                     }
-                  }
-                }}
-              />
+                  }}
+                />
+                {locationSuggestions.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full rounded-md border bg-popover shadow-md max-h-48 overflow-y-auto">
+                    {locationSuggestions.map((suggestion) => (
+                      <button
+                        key={suggestion.place_id}
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                        onClick={() => selectLocation(suggestion.description, suggestion.lat, suggestion.lng)}
+                      >
+                        {suggestion.description}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               {latitude && longitude && (
                 <p className="text-[11px] text-muted-foreground">
-                  Coordinates: {latitude.toFixed(4)}, {longitude.toFixed(4)}
+                  📍 {latitude.toFixed(4)}, {longitude.toFixed(4)}
                 </p>
               )}
             </div>
@@ -542,6 +720,85 @@ export function CreateListingSection({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tags">Tags</Label>
+              <div className="relative">
+                <Input
+                  id="tags"
+                  placeholder="Add tags (e.g., design, development, marketing)"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const trimmedInput = tagInput.trim();
+                      if (!trimmedInput) return;
+                      
+                      console.log('Enter pressed, input:', trimmedInput);
+                      console.log('Filtered tags:', filteredTags);
+                      
+                      if (filteredTags.length > 0) {
+                        addTag(filteredTags[0].id);
+                      } else {
+                        // Create new tag if it doesn't exist
+                        await createAndAddTag(trimmedInput);
+                      }
+                    }
+                  }}
+                />
+                {tagInput.trim() && (
+                  <div className="absolute z-10 mt-1 w-full rounded-md border bg-popover shadow-md max-h-48 overflow-y-auto">
+                    {filteredTags.length > 0 ? (
+                      filteredTags.map((tag) => (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            addTag(tag.id);
+                          }}
+                        >
+                          {tag.name}
+                        </button>
+                      ))
+                    ) : (
+                      <button
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors text-primary"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('Create button clicked, tag:', tagInput.trim());
+                          await createAndAddTag(tagInput.trim());
+                        }}
+                      >
+                        Create "{tagInput.trim()}"
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tagId) => (
+                    <Badge
+                      key={tagId}
+                      variant="secondary"
+                      className="cursor-pointer"
+                      onClick={() => removeTag(tagId)}
+                    >
+                      {getTagName(tagId)}
+                      <span className="ml-1 text-xs">×</span>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Type to search tags or press Enter to create a new one. Click a tag to remove it.
+              </p>
             </div>
             {submitError && (
               <p className="text-[11px] text-red-500">{submitError}</p>
