@@ -32,14 +32,61 @@ async def post_message_for_listing(
     msg = crud.add_message_to_room(listing_id, user_uid, message.content)
     if not msg:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to persist message")
-    # attempt to attach sender display name to response
+    
+    # Get sender display name
+    sender_name = None
     try:
         prof_res = crud.supabase.table('user_profiles').select('*').eq('uid', str(user_uid)).execute()
         if prof_res and prof_res.data:
             p = prof_res.data[0]
-            msg['sender_display_name'] = p.get('display_name') or p.get('full_name') or p.get('phone') or str(user_uid)[:8]
+            sender_name = p.get('display_name') or p.get('full_name') or p.get('phone') or str(user_uid)[:8]
+            msg['sender_display_name'] = sender_name
     except Exception:
         pass
+
+    # Send notification to the other person in the chat
+    try:
+        from app.crud.notification import NotificationCRUD
+        from app.schemas.notification import NotificationCreate
+        from app.crud.listing import ListingCRUD
+        
+        # Get listing to find poster and assignee
+        listing_crud = ListingCRUD(crud.supabase)
+        listing = await listing_crud.get_listing(listing_id)
+        
+        if listing:
+            poster_uid = listing.get("poster_uid")
+            assignee_uid = listing.get("assignee_uid")
+            
+            # Determine who to notify (the person who didn't send the message)
+            recipient_uid = None
+            sender_uid_str = str(user_uid)
+            
+            if poster_uid and str(poster_uid) == sender_uid_str and assignee_uid:
+                # Sender is poster, notify assignee
+                recipient_uid = str(assignee_uid)
+            elif assignee_uid and str(assignee_uid) == sender_uid_str and poster_uid:
+                # Sender is assignee, notify poster
+                recipient_uid = str(poster_uid)
+            
+            if recipient_uid:
+                sender_display = sender_name or "Someone"
+                message_preview = message.content[:50] + ('...' if len(message.content) > 50 else '')
+                
+                notif_crud = NotificationCRUD(crud.supabase)
+                await notif_crud.create_notification(
+                    NotificationCreate(
+                        user_uid=recipient_uid,
+                        title=f"New message from {sender_display}",
+                        body=message_preview,
+                        metadata={"redirect_url": f"/chats?listing={str(listing_id)}"}
+                    )
+                )
+    except Exception as e:
+        # Don't fail the message send if notification fails
+        import traceback
+        print(f"Failed to send chat notification: {e}")
+        traceback.print_exc()
 
     return msg
 

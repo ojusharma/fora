@@ -100,7 +100,7 @@ function mapApiListing(item: any): Listing {
     seller: "Creator",
     poster_uid: item.poster_uid ?? item.posterUid ?? item.poster ?? undefined,
     rating:
-      typeof item.poster_rating === "number" ? item.poster_rating : undefined,
+      typeof item.poster_user_rating === "number" ? item.poster_user_rating : undefined,
     reviewsCount: undefined,
     latitude: item.latitude ?? item.location_latitude ?? null,
     longitude: item.longitude ?? item.location_longitude ?? null,

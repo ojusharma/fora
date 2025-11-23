@@ -210,7 +210,7 @@ class ListingApplicantsCRUD:
             status: Optional status filter
             
         Returns:
-            List of applicants
+            List of applicants with user_rating
         """
         query = (
             self.supabase.table("listing_applicants")
@@ -222,7 +222,28 @@ class ListingApplicantsCRUD:
             query = query.eq("status", status.value)
         
         response = query.order("applied_at", desc=True).execute()
-        return response.data if response.data else []
+        applicants = response.data if response.data else []
+        
+        # Fetch user_rating for each applicant
+        if applicants:
+            applicant_uids = list({a.get("applicant_uid") for a in applicants if a.get("applicant_uid")})
+            if applicant_uids:
+                try:
+                    profiles_response = (
+                        self.supabase.table("user_profiles")
+                        .select("uid, user_rating")
+                        .in_("uid", [str(uid) for uid in applicant_uids])
+                        .execute()
+                    )
+                    rating_by_uid = {p["uid"]: p.get("user_rating") for p in profiles_response.data} if profiles_response.data else {}
+                    for applicant in applicants:
+                        applicant_uid = applicant.get("applicant_uid")
+                        if applicant_uid:
+                            applicant["user_rating"] = rating_by_uid.get(str(applicant_uid))
+                except Exception:
+                    pass
+        
+        return applicants
 
     async def get_listing_applicants_with_details(
         self, listing_id: UUID, status: Optional[ApplicantStatus] = None

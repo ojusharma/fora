@@ -162,6 +162,29 @@ async def update_application(
         supabase.table("listings").update({
             "status": "pending_confirmation"
         }).eq("id", str(listing_id)).execute()
+        
+        # Notify poster that assignee marked task as complete
+        from app.crud.listing import ListingCRUD
+        from app.crud.notification import NotificationCRUD
+        from app.schemas.notification import NotificationCreate
+        
+        listing = await ListingCRUD(supabase).get_listing(listing_id)
+        if listing and listing.get("poster_uid"):
+            # Get assignee name
+            assignee_profile = supabase.table("user_profiles").select("display_name, phone").eq("uid", str(applicant_uid)).execute()
+            assignee_name = "Assignee"
+            if assignee_profile.data and len(assignee_profile.data) > 0:
+                profile = assignee_profile.data[0]
+                assignee_name = profile.get("display_name") or profile.get("phone") or "Assignee"
+            
+            await NotificationCRUD(supabase).create_notification(
+                NotificationCreate(
+                    user_uid=listing["poster_uid"],
+                    title=f"{assignee_name} marked task as complete",
+                    body=f"{assignee_name} has completed '{listing.get('name', 'your task')}' and is waiting for your review.",
+                    metadata={"redirect_url": f"/market/{listing_id}"}
+                )
+            )
     
     return result
 
