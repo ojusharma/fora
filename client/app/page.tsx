@@ -3,6 +3,7 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { createClient } from "@/lib/supabase/server";
 import { HomeRecommendations } from "@/components/home-recommendations";
 import { TasksInProgress } from "@/components/tasks-in-progress";
+import { PostedTasksInProgress } from "@/components/posted-tasks-in-progress";
 import Link from "next/link";
 import { Suspense } from "react";
 import { NotificationBell } from "@/components/notification-bell";
@@ -67,6 +68,23 @@ export default async function Home() {
               }
             >
               <TasksInProgress />
+            </Suspense>
+
+            <Suspense
+              fallback={
+                <div className="w-full py-8">
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-8 bg-muted rounded w-1/4"></div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {[1, 2].map((i) => (
+                        <div key={i} className="h-40 bg-muted rounded"></div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              }
+            >
+              <PostedTasksInProgress />
             </Suspense>
 
             <Suspense
