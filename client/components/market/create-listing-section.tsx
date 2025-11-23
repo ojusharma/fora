@@ -182,7 +182,7 @@ export function CreateListingSection({
     async function fetchAvailableTags() {
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-        const response = await fetch(`${baseUrl}/api/v1/tags`);
+        const response = await fetch(`${baseUrl}/api/v1/tags/`);
         if (response.ok) {
           const tagsData = await response.json();
           if (mounted) {
@@ -357,7 +357,7 @@ export function CreateListingSection({
       
       // Create new tag
       console.log('Creating new tag via API...');
-      const response = await fetch(`${baseUrl}/api/v1/tags`, {
+      const response = await fetch(`${baseUrl}/api/v1/tags/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -546,7 +546,8 @@ export function CreateListingSection({
         process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
       const res = await fetch(
-        `${baseUrl}/api/v1/listings?user_uid=${encodeURIComponent(user.id)}`,
+        `${baseUrl}/api/v1/listings/?user_uid=${encodeURIComponent(user.id)}`,
+
         {
           method: "POST",
           headers: {

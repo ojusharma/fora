@@ -200,7 +200,7 @@ export function HomeRecommendations() {
 
   // 2. Track interaction (optional but recommended)
   await fetch(
-    `${baseUrl}/api/v1/feed/interactions/${listingId}?user_uid=${uid}`,
+    `${baseUrl}/api/v1/feed/interactions/${listingId}/?user_uid=${uid}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

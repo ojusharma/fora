@@ -6,7 +6,7 @@ interface MarketContentProps {
 
 async function fetchListings(baseUrl: string) {
   try {
-    const res = await fetch(`${baseUrl}/api/v1/listings?exclude_status=completed`, {
+    const res = await fetch(`${baseUrl}/api/v1/listings/?exclude_status=completed`, {
       cache: "no-store",
     });
     if (res.ok) {

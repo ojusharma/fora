@@ -88,7 +88,7 @@ export const RealtimeChat = ({
           // eslint-disable-next-line no-console
           console.debug('[RealtimeChat] persisting message', { listingId, user: currentUserId, content: newMessage })
 
-          const resp = await fetch(`${baseUrl}/api/v1/chats/${encodeURIComponent(listingId)}/messages?user_uid=${encodeURIComponent(currentUserId)}`, {
+          const resp = await fetch(`${baseUrl}/api/v1/chats/${encodeURIComponent(listingId)}/messages/?user_uid=${encodeURIComponent(currentUserId)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: newMessage }),
