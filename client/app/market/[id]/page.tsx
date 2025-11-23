@@ -16,7 +16,7 @@ import { NotificationBell } from "@/components/notification-bell";
 
 const mapContainerStyle = { width: "100%", height: "300px" };
 
-export default function Page() {
+function MarketDetailContent() {
   const params = useParams();
   const id = params?.id as string;
   
@@ -369,5 +369,17 @@ export default function Page() {
         </footer>
       </div>
     </main>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen flex items-center justify-center">
+        <p>Loading...</p>
+      </main>
+    }>
+      <MarketDetailContent />
+    </Suspense>
   );
 }

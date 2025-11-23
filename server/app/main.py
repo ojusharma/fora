@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.core.config import get_settings
 from app.api.v1.api import api_router
@@ -58,6 +59,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 # Configure CORS middleware
 app.add_middleware(
     CORSMiddleware,

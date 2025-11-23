@@ -60,8 +60,8 @@ export function PostedTasksInProgress() {
 
         // Fetch listings posted by user with status "in_progress" and "pending_confirmation"
         const [inProgressRes, pendingRes] = await Promise.all([
-          fetch(`${baseUrl}/api/v1/listings?poster_uid=${uid}&status=in_progress`, { cache: "no-store" }),
-          fetch(`${baseUrl}/api/v1/listings?poster_uid=${uid}&status=pending_confirmation`, { cache: "no-store" })
+          fetch(`${baseUrl}/api/v1/listings/?poster_uid=${uid}&status=in_progress`, { cache: "no-store" }),
+          fetch(`${baseUrl}/api/v1/listings/?poster_uid=${uid}&status=pending_confirmation`, { cache: "no-store" })
         ]);
 
         const inProgress = inProgressRes.ok ? await inProgressRes.json() : [];
@@ -127,7 +127,8 @@ export function PostedTasksInProgress() {
 
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
         const response = await fetch(
-          `${baseUrl}/api/v1/listings/${selectedTask.id}?user_uid=${userData.user.id}`,
+          `${baseUrl}/api/v1/listings/${selectedTask.id}/?user_uid=${userData.user.id}`,
+
           {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -209,7 +210,8 @@ export function PostedTasksInProgress() {
       // Confirm completion - update listing status to completed
       console.log("Confirming completion...");
       const response = await fetch(
-        `${baseUrl}/api/v1/listings/${selectedTask.id}/confirm-completion?user_uid=${userData.user.id}`,
+        `${baseUrl}/api/v1/listings/${selectedTask.id}/confirm-completion/?user_uid=${userData.user.id}`,
+
         {
           method: "POST",
           headers: { "Content-Type": "application/json" }

@@ -1,6 +1,5 @@
 import { AuthButton } from "@/components/auth-button";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { createClient } from "@/lib/supabase/server";
 import { HomeRecommendations } from "@/components/home-recommendations";
 import { TasksInProgress } from "@/components/tasks-in-progress";
 import { PostedTasksInProgress } from "@/components/posted-tasks-in-progress";
@@ -11,9 +10,7 @@ import { CreditsDisplay } from "@/components/credits-display";
 import { AdminLink } from "@/components/admin-link";
 
 
-export default async function Home() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
+export default function Home() {
 
   return (
     <main className="min-h-screen flex flex-col items-center">

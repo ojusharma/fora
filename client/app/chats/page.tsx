@@ -8,7 +8,9 @@ import ChatsApp from '@/components/chats/chats-app'
 import { NotificationBell } from '@/components/notification-bell'
 import { CreditsDisplay } from '@/components/credits-display'
 
-export default async function Page({ searchParams }: { searchParams?: { listing?: string } }) {
+async function ChatsContent({ searchParams }: { searchParams?: Promise<{ listing?: string }> }) {
+  const params = await searchParams;
+  
   const supabase = await createClient()
   const { data, error } = await supabase.auth.getClaims()
 
@@ -27,11 +29,11 @@ export default async function Page({ searchParams }: { searchParams?: { listing?
   const displayName = profile?.display_name ?? profile?.full_name ?? String(currentUid).slice(0, 8)
 
   // Fetch listings where user is poster
-  const posterRes = await fetch(`${baseUrl}/api/v1/listings?poster_uid=${encodeURIComponent(currentUid)}`, { cache: 'no-store' })
+  const posterRes = await fetch(`${baseUrl}/api/v1/listings/?poster_uid=${encodeURIComponent(currentUid)}`, { cache: 'no-store' })
   const posterListings = posterRes.ok ? (await posterRes.json()) : []
 
   // Fetch listings where user is assignee
-  const assigneeRes = await fetch(`${baseUrl}/api/v1/listings?assignee_uid=${encodeURIComponent(currentUid)}`, { cache: 'no-store' })
+  const assigneeRes = await fetch(`${baseUrl}/api/v1/listings/?assignee_uid=${encodeURIComponent(currentUid)}`, { cache: 'no-store' })
   const assigneeListings = assigneeRes.ok ? (await assigneeRes.json()) : []
 
   // Attach assignee display names to listings (batch fetch user profiles)
@@ -62,10 +64,16 @@ export default async function Page({ searchParams }: { searchParams?: { listing?
   const myListings = posterListings
   const assignedListings = assigneeListings
 
-  const params = await searchParams;
-
   const initialListingId = params?.listing ?? null
 
+  return (
+    <div className="w-full max-w-6xl mx-auto h-[70vh]">
+      <ChatsApp myListings={myListings} assignedListings={assignedListings} currentUid={String(currentUid)} currentDisplayName={displayName} initialListingId={initialListingId} />
+    </div>
+  )
+}
+
+export default function Page({ searchParams }: { searchParams?: Promise<{ listing?: string }> }) {
   return (
     <main className="min-h-screen flex flex-col items-center">
       <div className="flex-1 w-full flex flex-col gap-20 items-center">
@@ -78,23 +86,21 @@ export default async function Page({ searchParams }: { searchParams?: { listing?
               <Link href={'/chats'}>my chats</Link>
             </div>
             <div className="flex items-center gap-4">
-  <Suspense>
-    <CreditsDisplay />
-  </Suspense>
-  <Suspense>
-    <NotificationBell />
-  </Suspense>
-
-  <AuthButton />
-</div>
+              <Suspense>
+                <CreditsDisplay />
+              </Suspense>
+              <Suspense>
+                <NotificationBell />
+              </Suspense>
+              <AuthButton />
+            </div>
           </div>
         </nav>
 
         <div className="flex-1 flex flex-col gap-20 max-w-5xl p-5">
-          <div className="w-full max-w-6xl mx-auto h-[70vh]">
-            {/* ChatsApp is a client component that renders the two-column UI */}
-            <ChatsApp myListings={myListings} assignedListings={assignedListings} currentUid={String(currentUid)} currentDisplayName={displayName} initialListingId={initialListingId} />
-          </div>
+          <Suspense fallback={<div className="w-full max-w-6xl mx-auto h-[70vh] flex items-center justify-center">Loading chats...</div>}>
+            <ChatsContent searchParams={searchParams} />
+          </Suspense>
         </div>
 
         <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs gap-8 py-16">

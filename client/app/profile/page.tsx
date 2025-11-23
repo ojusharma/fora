@@ -1,5 +1,3 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
 import { AuthButton } from "@/components/auth-button";
@@ -8,8 +6,10 @@ import { ProfileContent } from "@/components/profile/profile-content";
 import { ProfileSkeleton } from "@/components/profile/profile-skeleton";
 import { NotificationBell } from "@/components/notification-bell";
 import { CreditsDisplay } from "@/components/credits-display";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
-export default async function ProfilePage() {
+async function ProfileData() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
 
@@ -19,6 +19,11 @@ export default async function ProfilePage() {
 
   const userId = data.claims.sub;
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+  return <ProfileContent userId={userId} baseUrl={baseUrl} />;
+}
+
+export default function ProfilePage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center">
@@ -45,10 +50,10 @@ export default async function ProfilePage() {
         </nav>
 
         <Suspense fallback={<ProfileSkeleton />}>
-          <ProfileContent userId={userId} baseUrl={baseUrl} />
+          <ProfileData />
         </Suspense>
 
-        <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs gap-8 py-16">
+        <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs gap-8 py-16\">"
           <p>
             Powered by{" "}
             <a
