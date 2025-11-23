@@ -13,6 +13,7 @@ class ListingStatus(str, Enum):
     """Listing status enum."""
     OPEN = "open"
     IN_PROGRESS = "in_progress"
+    PENDING_CONFIRMATION = "pending_confirmation"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 

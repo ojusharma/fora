@@ -156,3 +156,98 @@ async def delete_listing(
             detail="Listing not found or unauthorized",
         )
     return None
+
+
+@router.post(
+    "/{listing_id}/confirm-completion",
+    response_model=ListingResponse,
+    summary="Confirm task completion (poster only)",
+)
+async def confirm_task_completion(
+    listing_id: UUID,
+    user_uid: UUID = Depends(get_current_user_uid),
+    crud: ListingCRUD = Depends(get_listing_crud),
+    supabase: Client = Depends(get_supabase_client),
+):
+    """
+    Poster confirms that the task has been completed.
+    Updates listing status to 'completed'.
+    Updates assignee's application status to 'completed'.
+    Adds credits to assignee's account.
+    """
+    # Get the listing to verify poster
+    listing = await crud.get_listing(listing_id)
+    if not listing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Listing not found",
+        )
+    
+    if listing["poster_uid"] != str(user_uid):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the poster can confirm completion",
+        )
+    
+    assignee_uid = listing.get("assignee_uid")
+    compensation = listing.get("compensation", 0)
+    
+    # Ensure compensation is a number
+    try:
+        compensation = float(compensation) if compensation else 0
+    except (ValueError, TypeError):
+        compensation = 0
+    
+    print(f"[CONFIRM COMPLETION] Listing ID: {listing_id}")
+    print(f"[CONFIRM COMPLETION] Assignee UID: {assignee_uid}")
+    print(f"[CONFIRM COMPLETION] Compensation: {compensation}")
+    
+    # Update listing status to completed
+    result = await crud.update_listing(
+        listing_id,
+        ListingUpdate(status=ListingStatus.COMPLETED),
+        user_uid
+    )
+    
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to update listing status",
+        )
+    
+    # Update assignee's application status to completed
+    if assignee_uid:
+        print(f"[CONFIRM COMPLETION] Updating applicant status to completed...")
+        applicant_update = supabase.table("listing_applicants").update({
+            "status": "completed"
+        }).eq("listing_id", str(listing_id)).eq("applicant_uid", assignee_uid).execute()
+        
+        print(f"[CONFIRM COMPLETION] Applicant update result: {applicant_update.data}")
+        
+        # Add credits to assignee's account
+        print(f"[CONFIRM COMPLETION] Compensation check: {compensation} > 0 = {compensation > 0}")
+        if compensation > 0:
+            print(f"[CONFIRM COMPLETION] Adding {compensation} credits to assignee...")
+            # Get current credits
+            profile_response = supabase.table("user_profiles").select("credits").eq("uid", assignee_uid).execute()
+            
+            print(f"[CONFIRM COMPLETION] Profile response: {profile_response.data}")
+            
+            if profile_response.data and len(profile_response.data) > 0:
+                current_credits = profile_response.data[0].get("credits", 0) or 0
+                new_credits = int(current_credits + compensation)
+                
+                print(f"[CONFIRM COMPLETION] Current credits: {current_credits}, New credits: {new_credits}")
+                
+                # Update credits
+                credit_update = supabase.table("user_profiles").update({
+                    "credits": new_credits
+                }).eq("uid", assignee_uid).execute()
+                
+                print(f"[CONFIRM COMPLETION] Credit update result: {credit_update.data}")
+            else:
+                print(f"[CONFIRM COMPLETION] ERROR: No profile found for assignee {assignee_uid}")
+        else:
+            print(f"[CONFIRM COMPLETION] Skipping credit addition - compensation is 0 or invalid")
+    
+    return result

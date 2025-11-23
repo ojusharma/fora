@@ -51,32 +51,33 @@ interface ProfileContentProps {
 }
 
 async function fetchProfileData(userId: string, baseUrl: string) {
-  const [profileRes, statsRes, prefsRes, listingsRes, completedTasksRes, pendingTasksRes] = await Promise.all([
+  const [profileRes, statsRes, prefsRes, listingsRes, completedListingsRes, pendingListingsRes] = await Promise.all([
     fetch(`${baseUrl}/api/v1/users/${userId}`, { cache: "no-store" }),
     fetch(`${baseUrl}/api/v1/users/${userId}/stats/or-create`, { cache: "no-store" }),
     fetch(`${baseUrl}/api/v1/users/${userId}/preferences/with-tags`, { cache: "no-store" }),
     fetch(`${baseUrl}/api/v1/listings?poster_uid=${userId}`, { cache: "no-store" }),
     fetch(`${baseUrl}/api/v1/listings?assignee_uid=${userId}&status=completed`, { cache: "no-store" }),
-    fetch(`${baseUrl}/api/v1/listings/user/${userId}/with-listings?status=pending_confirmation`, { cache: "no-store" }),
+    fetch(`${baseUrl}/api/v1/listings?assignee_uid=${userId}&status=pending_confirmation`, { cache: "no-store" }),
   ]);
 
   const profile: UserProfile | null = profileRes.ok ? await profileRes.json() : null;
   const stats: UserStats | null = statsRes.ok ? await statsRes.json() : null;
   const preferences: UserPreference[] = prefsRes.ok ? await prefsRes.json() : [];
   const listings: Listing[] = listingsRes.ok ? await listingsRes.json() : [];
-  const completedTasks: Listing[] = completedTasksRes.ok ? await completedTasksRes.json() : [];
   
-  // Extract listings from pending applications
-  const pendingApplicants = pendingTasksRes.ok ? await pendingTasksRes.json() : [];
-  const pendingTasks: Listing[] = pendingApplicants
-    .filter((app: any) => app.listing || app.listings)
-    .map((app: any) => {
-      const listing = app.listing || app.listings;
-      return {
-        ...listing,
-        status: "pending_confirmation"
-      };
-    });
+  // Get completed listings where user is assignee
+  const completedListings: Listing[] = completedListingsRes.ok ? await completedListingsRes.json() : [];
+  const completedTasks = completedListings.map(listing => ({
+    ...listing,
+    status: "completed"
+  }));
+  
+  // Get pending confirmation listings where user is assignee
+  const pendingListings: Listing[] = pendingListingsRes.ok ? await pendingListingsRes.json() : [];
+  const pendingTasks = pendingListings.map(listing => ({
+    ...listing,
+    status: "pending_confirmation"
+  }));
 
   // Combine pending and completed tasks
   const allTasks = [...pendingTasks, ...completedTasks];
@@ -120,9 +121,9 @@ export async function ProfileContent({ userId, baseUrl }: ProfileContentProps) {
               <span className="text-sm font-medium">Role</span>
               <Badge variant="secondary">{profile?.role || "user"}</Badge>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Credits</span>
-              <span className="text-sm font-semibold">{profile?.credits || 0}</span>
+            <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+              <span className="text-sm font-semibold text-green-800 dark:text-green-200">Credits Balance</span>
+              <span className="text-2xl font-bold text-green-600 dark:text-green-400">{profile?.credits || 0}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Phone</span>
@@ -374,7 +375,24 @@ export async function ProfileContent({ userId, baseUrl }: ProfileContentProps) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {task.status !== "completed" && (
+                    {task.status === "completed" ? (
+                      <div className="flex items-center gap-1 text-green-600" title="Task completed">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                          <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                      </div>
+                    ) : (
                       <div className="flex items-center gap-1 text-yellow-600" title="Poster must confirm completion">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"

@@ -1,6 +1,7 @@
 CREATE TYPE listing_status AS ENUM (
   'open',
   'in_progress',
+  'pending_confirmation',
   'completed',
   'cancelled'
 );
@@ -10,7 +11,8 @@ CREATE TYPE applicant_status AS ENUM (
   'shortlisted',
   'rejected',
   'withdrawn',
-  'pending_confirmation'
+  'pending_confirmation',
+  'completed'
 );
 
 CREATE TYPE user_role AS ENUM (
