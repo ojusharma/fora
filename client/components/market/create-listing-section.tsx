@@ -23,9 +23,35 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+
+// Helper function to calculate distance between two coordinates (Haversine formula)
+function calculateDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
+}
 
 type ListingImage = {
   url: string;
@@ -44,6 +70,10 @@ type Listing = {
   poster_uid?: string;
   rating?: number;
   reviewsCount?: number;
+  latitude?: number | null;
+  longitude?: number | null;
+  location_address?: string | null;
+  tags?: number[];
 };
 
 type CreateListingSectionProps = {
@@ -72,6 +102,10 @@ function mapApiListing(item: any): Listing {
     rating:
       typeof item.poster_rating === "number" ? item.poster_rating : undefined,
     reviewsCount: undefined,
+    latitude: item.latitude ?? item.location_latitude ?? null,
+    longitude: item.longitude ?? item.location_longitude ?? null,
+    location_address: item.location_address ?? null,
+    tags: Array.isArray(item.tags) ? item.tags : [],
   };
 }
 
@@ -111,6 +145,14 @@ export function CreateListingSection({
       : [],
   );
   const [userId, setUserId] = useState<string | null>(null);
+  
+  // Filter states
+  const [nameFilter, setNameFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
+  const [locationRadius, setLocationRadius] = useState("25");
+  const [locationCenter, setLocationCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [isGeocodingFilter, setIsGeocodingFilter] = useState(false);
+  const [selectedFilterTags, setSelectedFilterTags] = useState<number[]>([]);
 
   // Merge incoming listings into existing list, keeping incoming first and
   // removing duplicates by `id`.
@@ -203,6 +245,8 @@ export function CreateListingSection({
           seller: l.poster_uid && nameByUid[l.poster_uid] ? nameByUid[l.poster_uid] : l.seller,
         }));
 
+        console.log('Enriched listings sample:', updatedMarket[0]);
+
         // also populate myListings for listings posted by current user
         const mine = updatedMarket.filter((l) => currentUid && l.poster_uid === currentUid) as Listing[];
 
@@ -243,6 +287,43 @@ export function CreateListingSection({
       setFilteredTags([]);
     }
   }, [tagInput, availableTags, tags]);
+
+  // Geocode location filter with debounce
+  React.useEffect(() => {
+    async function geocodeFilterLocation() {
+      if (!locationFilter.trim()) {
+        setLocationCenter(null);
+        return;
+      }
+
+      setIsGeocodingFilter(true);
+      try {
+        const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(locationFilter)}&key=${apiKey}`
+        );
+        const data = await response.json();
+
+        if (data.status === "OK" && data.results.length > 0) {
+          const loc = data.results[0].geometry.location;
+          setLocationCenter({ lat: loc.lat, lng: loc.lng });
+        } else {
+          setLocationCenter(null);
+        }
+      } catch (error) {
+        console.error("Geocoding error:", error);
+        setLocationCenter(null);
+      } finally {
+        setIsGeocodingFilter(false);
+      }
+    }
+
+    const timer = setTimeout(() => {
+      geocodeFilterLocation();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [locationFilter]);
 
   const addTag = (tagId: number) => {
     if (!tags.includes(tagId)) {
@@ -535,8 +616,186 @@ export function CreateListingSection({
     }
   };
 
+  // Apply filters to marketplace listings
+  const filteredMarketListings = marketListings.filter((listing) => {
+    // Name filter
+    if (nameFilter && !listing.name.toLowerCase().includes(nameFilter.toLowerCase())) {
+      return false;
+    }
+
+    // Location filter (geocoded location with radius)
+    if (locationCenter && locationFilter) {
+      if (!listing.latitude || !listing.longitude) {
+        return false; // Exclude listings without location data
+      }
+      
+      const radius = parseFloat(locationRadius) || 25; // Default 25 km
+      const distance = calculateDistance(
+        locationCenter.lat,
+        locationCenter.lng,
+        listing.latitude,
+        listing.longitude
+      );
+      
+      if (distance > radius) {
+        return false;
+      }
+    }
+
+    // Tag filter - listing must have at least one of the selected tags
+    if (selectedFilterTags.length > 0) {
+      const listingTags = listing.tags || [];
+      const hasMatchingTag = selectedFilterTags.some(tagId => listingTags.includes(tagId));
+      if (!hasMatchingTag) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  console.log('Filter Debug:', {
+    totalListings: marketListings.length,
+    filteredListings: filteredMarketListings.length,
+    nameFilter,
+    locationFilter,
+    locationCenter,
+    selectedFilterTags,
+    sampleListing: marketListings[0]
+  });
+
+  const clearFilters = () => {
+    setNameFilter("");
+    setLocationFilter("");
+    setLocationRadius("25");
+    setLocationCenter(null);
+    setSelectedFilterTags([]);
+  };
+
+  const toggleFilterTag = (tagId: number) => {
+    setSelectedFilterTags(prev =>
+      prev.includes(tagId)
+        ? prev.filter(id => id !== tagId)
+        : [...prev, tagId]
+    );
+  };
+
+  const hasActiveFilters = nameFilter || locationFilter || selectedFilterTags.length > 0;
+
   return (
     <div className="flex flex-col gap-4">
+      {/* Filter Section - Only show on marketplace tab */}
+      {activeTab === "marketplace" && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">Filters</h2>
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="text-xs"
+              >
+                Clear all
+              </Button>
+            )}
+          </div>
+          
+          <div className="grid gap-4 md:grid-cols-3">
+            {/* Name Filter */}
+            <div className="space-y-2">
+              <Label htmlFor="name-filter">Listing Name</Label>
+              <Input
+                id="name-filter"
+                type="text"
+                placeholder="Search by name..."
+                value={nameFilter}
+                onChange={(e) => setNameFilter(e.target.value)}
+              />
+            </div>
+
+            {/* Location Filter */}
+            <div className="space-y-2">
+              <Label htmlFor="location-filter">
+                Location
+                {isGeocodingFilter && (
+                  <span className="ml-2 text-xs text-muted-foreground">(searching...)</span>
+                )}
+              </Label>
+              <Input
+                id="location-filter"
+                type="text"
+                placeholder="e.g., New York, NY"
+                value={locationFilter}
+                onChange={(e) => setLocationFilter(e.target.value)}
+              />
+              {locationFilter && (
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="location-radius" className="text-xs whitespace-nowrap">
+                    Within
+                  </Label>
+                  <Input
+                    id="location-radius"
+                    type="number"
+                    placeholder="25"
+                    value={locationRadius}
+                    onChange={(e) => setLocationRadius(e.target.value)}
+                    className="w-20 h-8 text-xs"
+                    min="1"
+                  />
+                  <span className="text-xs text-muted-foreground">km</span>
+                </div>
+              )}
+            </div>
+
+            {/* Tags Filter */}
+            {availableTags.length > 0 && (
+              <div className="space-y-2">
+                <Label>Tags</Label>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between">
+                      {selectedFilterTags.length === 0
+                        ? "Select tags..."
+                        : `${selectedFilterTags.length} tag${selectedFilterTags.length > 1 ? 's' : ''} selected`}
+                      <span className="ml-2">▼</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-[400px] max-h-[300px] overflow-y-auto">
+                    {availableTags.map((tag) => (
+                      <DropdownMenuCheckboxItem
+                        key={tag.id}
+                        checked={selectedFilterTags.includes(tag.id)}
+                        onCheckedChange={() => toggleFilterTag(tag.id)}
+                      >
+                        {tag.name}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {selectedFilterTags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {selectedFilterTags.map((tagId) => {
+                      const tag = availableTags.find((t) => t.id === tagId);
+                      return tag ? (
+                        <Badge
+                          key={tag.id}
+                          variant="default"
+                          className="cursor-pointer"
+                          onClick={() => toggleFilterTag(tag.id)}
+                        >
+                          {tag.name} ×
+                        </Badge>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <div className="flex items-center justify-between gap-4">
           <div className="inline-flex items-center rounded-md bg-muted p-1 text-xs">
@@ -818,13 +1077,13 @@ export function CreateListingSection({
       </Dialog>
 
       {activeTab === "marketplace" ? (
-        marketListings.length === 0 ? (
+        filteredMarketListings.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No listings yet. Be the first to create one.
+            {hasActiveFilters ? "No listings match your filters." : "No listings yet. Be the first to create one."}
           </p>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {marketListings.map((listing) => (
+            {filteredMarketListings.map((listing) => (
               <ListingCard key={listing.id} listing={listing} />
             ))}
           </div>
