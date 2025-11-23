@@ -253,6 +253,19 @@ async def confirm_task_completion(
                 }).eq("uid", assignee_uid).execute()
                 
                 print(f"[CONFIRM COMPLETION] Credit update result: {credit_update.data}")
+                
+                # Notify assignee that task is complete and credits earned
+                from app.crud.notification import NotificationCRUD
+                from app.schemas.notification import NotificationCreate
+                
+                await NotificationCRUD(supabase).create_notification(
+                    NotificationCreate(
+                        user_uid=str(assignee_uid),
+                        title="Task completed - credits earned!",
+                        body=f"'{listing.get('name', 'Task')}' has been marked as complete. You earned {int(compensation)} credits!",
+                        metadata={"redirect_url": f"/market/{listing_id}"}
+                    )
+                )
             else:
                 print(f"[CONFIRM COMPLETION] ERROR: No profile found for assignee {assignee_uid}")
         else:

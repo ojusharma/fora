@@ -225,7 +225,14 @@ function MarketDetailContent() {
                 )}
               </div>
               {posterDisplay && (
-                <p className="text-xs text-muted-foreground">Posted by {posterDisplay}</p>
+                <p className="text-xs text-muted-foreground">
+                  Posted by {posterDisplay}
+                  {listing.poster_user_rating && (
+                    <span className="ml-2">
+                      ★ {listing.poster_user_rating.toFixed(1)}
+                    </span>
+                  )}
+                </p>
               )}
                 {!isPoster && currentUid && (!myApplication || myApplication.status === 'withdrawn' || myApplication.status === 'rejected') && (
                   <div className="pt-2">
@@ -321,7 +328,14 @@ function MarketDetailContent() {
                     {applicants.map((a) => (
                       <div key={String(a.applicant_uid)} className="flex flex-col gap-1 p-3 border rounded">
                         <div className="flex items-center justify-between">
-                          <div className="text-sm font-medium">{a.display_name}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-medium">{a.display_name}</div>
+                            {a.user_rating && (
+                              <span className="text-xs text-muted-foreground">
+                                ★ {a.user_rating.toFixed(1)}
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-muted-foreground">{String(a.status)}</div>
                         </div>
                         {a.message && <div className="text-xs text-muted-foreground">{a.message}</div>}
