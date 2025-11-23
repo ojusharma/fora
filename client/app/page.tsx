@@ -3,7 +3,6 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { createClient } from "@/lib/supabase/server";
 import { HomeRecommendations } from "@/components/home-recommendations";
 import { TasksInProgress } from "@/components/tasks-in-progress";
-import { AdminLink } from "@/components/admin-link";
 import Link from "next/link";
 import { Suspense } from "react";
 import { NotificationBell } from "@/components/notification-bell";
@@ -22,7 +21,6 @@ export default async function Home() {
               <Link href={"/"}>fora</Link>
               <Link href={"/market"}>marketplace</Link>
               <Link href={"/map"}>map</Link>
-              <AdminLink />
               {process.env.NODE_ENV === "development" && (
                 <Link
                   href={"/ml-admin"}

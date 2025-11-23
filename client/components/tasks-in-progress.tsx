@@ -42,7 +42,6 @@ export function TasksInProgress() {
   const [posterName, setPosterName] = useState<string>("the poster");
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
-  const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function loadShortlistedTasks() {
@@ -64,13 +63,10 @@ export function TasksInProgress() {
           fetch(`${baseUrl}/api/v1/listings/user/${uid}/with-listings?status=pending_confirmation`, { cache: "no-store" })
         ]);
 
-        console.log("Tasks in Progress API response status:", shortlistedRes.status, pendingRes.status);
-
         if (shortlistedRes.ok || pendingRes.ok) {
           const shortlisted = shortlistedRes.ok ? await shortlistedRes.json() : [];
           const pending = pendingRes.ok ? await pendingRes.json() : [];
           const applications = [...shortlisted, ...pending];
-          console.log("Tasks in Progress data:", applications);
           
           // Filter to ensure we have the listing data
           const validTasks = applications.filter((app: any) => app.listing || app.listings);
@@ -81,10 +77,7 @@ export function TasksInProgress() {
             listing: app.listing || app.listings,
           }));
           
-          console.log("Normalized tasks:", normalizedTasks);
           setTasks(normalizedTasks);
-        } else {
-          console.error("Failed to fetch tasks");
         }
       } catch (err) {
         console.error("Failed to load tasks in progress:", err);
@@ -156,10 +149,7 @@ export function TasksInProgress() {
         );
 
         if (ratingResponse.ok) {
-          const result = await ratingResponse.json();
-          console.log("Rating submitted successfully:", result);
-        } else {
-          console.error("Failed to submit rating");
+          console.log("Rating submitted successfully");
         }
       }
       
@@ -174,8 +164,6 @@ export function TasksInProgress() {
       );
 
       if (statusResponse.ok) {
-        console.log("Status updated to pending_confirmation");
-        
         // Update the task in the local state
         setTasks(prev => prev.map(t => 
           t.listing_id === selectedTask.listing_id 
@@ -283,7 +271,7 @@ export function TasksInProgress() {
                     size="sm"
                     className="flex items-center gap-1"
                   >
-                    <Link href={`/chat/${listing.id}`}>
+                    <Link href="/chats">
                       <MessageSquare className="h-4 w-4" />
                       Chat
                     </Link>

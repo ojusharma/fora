@@ -396,13 +396,14 @@ class ListingApplicantsCRUD:
             if not updated.data:
                 return None
 
-            # ⭐ Assign shortlisted applicant to the listing
-            self.supabase.table("listings").update({
-                "assignee_uid": str(applicant_uid)
-            }).eq("id", str(listing_id)).execute()
+        # Update listing status to in_progress and set assignee_uid
+        self.supabase.table("listings").update({
+            "status": "in_progress",
+            "assignee_uid": str(applicant_uid)
+        }).eq("id", str(listing_id)).execute()
 
-            # Load listing
-            listing = await ListingCRUD(self.supabase).get_listing(listing_id)
+        # Load listing (title + poster)
+        listing = await ListingCRUD(self.supabase).get_listing(listing_id)
 
             # Notify applicant
             await self._send_notification(

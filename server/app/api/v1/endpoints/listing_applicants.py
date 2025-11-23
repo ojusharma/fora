@@ -147,6 +147,7 @@ async def update_application(
     applicant_uid: UUID,
     update_data: ListingApplicantUpdate,
     crud: ListingApplicantsCRUD = Depends(get_listing_applicants_crud),
+    supabase: Client = Depends(get_supabase_client),
 ):
     """Update an application (e.g., change status or message)."""
     result = await crud.update_application(listing_id, applicant_uid, update_data)
@@ -155,6 +156,13 @@ async def update_application(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Application not found",
         )
+    
+    # If applicant status is being set to pending_confirmation, update listing status too
+    if update_data.status == ApplicantStatus.PENDING_CONFIRMATION:
+        supabase.table("listings").update({
+            "status": "pending_confirmation"
+        }).eq("id", str(listing_id)).execute()
+    
     return result
 
 

@@ -156,3 +156,47 @@ async def delete_listing(
             detail="Listing not found or unauthorized",
         )
     return None
+
+
+@router.post(
+    "/{listing_id}/confirm-completion",
+    response_model=ListingResponse,
+    summary="Confirm task completion (poster only)",
+)
+async def confirm_task_completion(
+    listing_id: UUID,
+    user_uid: UUID = Depends(get_current_user_uid),
+    crud: ListingCRUD = Depends(get_listing_crud),
+):
+    """
+    Poster confirms that the task has been completed.
+    Updates listing status to 'completed'.
+    """
+    # Get the listing to verify poster
+    listing = await crud.get_listing(listing_id)
+    if not listing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Listing not found",
+        )
+    
+    if listing["poster_uid"] != str(user_uid):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the poster can confirm completion",
+        )
+    
+    # Update listing status to completed
+    result = await crud.update_listing(
+        listing_id,
+        ListingUpdate(status=ListingStatus.COMPLETED),
+        user_uid
+    )
+    
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to update listing status",
+        )
+    
+    return result

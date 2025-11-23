@@ -1,6 +1,7 @@
 CREATE TYPE listing_status AS ENUM (
   'open',
   'in_progress',
+  'pending_confirmation',
   'completed',
   'cancelled'
 );
