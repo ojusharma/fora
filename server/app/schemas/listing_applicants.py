@@ -16,6 +16,7 @@ class ApplicantStatus(str, Enum):
     REJECTED = "rejected"
     WITHDRAWN = "withdrawn"
     PENDING_CONFIRMATION = "pending_confirmation"
+    COMPLETED = "completed"
 
 
 # ==================== BASE SCHEMAS ====================
