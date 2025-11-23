@@ -8,6 +8,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { NotificationBell } from "@/components/notification-bell";
 import { CreditsDisplay } from "@/components/credits-display";
+import { AdminLink } from "@/components/admin-link";
 
 export default async function MarketPage() {
   const supabase = await createClient();
@@ -29,6 +30,7 @@ export default async function MarketPage() {
               <Link href={"/"}>fora</Link>
               <Link href={"/market"}>marketplace</Link>
               <Link href={"/map"}>map</Link>
+              <AdminLink />
               <Link href="/chats">chats</Link>
             </div>
             <div className="flex items-center gap-4">

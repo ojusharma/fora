@@ -89,7 +89,7 @@ function mapApiListing(item: any): Listing {
       item.compensation !== null && item.compensation !== undefined
         ? String(item.compensation)
         : "",
-    currency: item.currency ?? "USD",
+    currency: item.currency ?? "Credits",
     deadline: item.deadline ?? undefined,
     images: Array.isArray(item.images)
       ? item.images.map((url: string) => ({
@@ -114,7 +114,7 @@ export function CreateListingSection({
 }: CreateListingSectionProps) {
   const [name, setName] = useState("");
   const [compensation, setCompensation] = useState("");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("Credits");
   const [deadline, setDeadline] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
@@ -234,6 +234,7 @@ export function CreateListingSection({
           if (!p) return;
           const uid = p.uid ?? p.id ?? null;
           if (!uid) return;
+          // prefer a display field if present, fall back to phone or short uid
           const display = p.display_name ?? p.full_name ?? p.phone ?? String(uid).slice(0, 8);
           nameByUid[String(uid)] = display;
         });
@@ -576,7 +577,7 @@ export function CreateListingSection({
         id: String(created.id ?? Date.now().toString()),
         name: name.trim(),
         compensation: compensation.trim(),
-        currency: currency.trim() || "USD",
+        currency: currency.trim() || "Credits",
         deadline: deadline || undefined,
         description: description.trim(),
         images: images
@@ -594,10 +595,9 @@ export function CreateListingSection({
       if (!user || newListing.poster_uid !== user.id) {
         setMarketListings((prev) => mergeUnique([newListing], prev));
       }
-      
       setName("");
       setCompensation("");
-      setCurrency("USD");
+      setCurrency("Credits");
       setDeadline("");
       setDescription("");
       setLocation("");
@@ -856,9 +856,10 @@ export function CreateListingSection({
                 />
                 <Input
                   id="currency"
-                  className="w-20 uppercase"
+                  className="w-20"
                   maxLength={3}
                   value={currency}
+                  disabled
                   onChange={(e) => setCurrency(e.target.value.toUpperCase())}
                 />
               </div>
@@ -1137,8 +1138,8 @@ function ListingCard({ listing }: { listing: Listing }) {
           )}
           {listing.compensation && (
             <span className="text-sm font-semibold">
-              From {listing.currency || "USD"}{" "}
               {Number(listing.compensation).toLocaleString()}
+              {" Credits"}{" "}
             </span>
           )}
         </CardFooter>

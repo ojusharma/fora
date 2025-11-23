@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { NotificationBell } from "@/components/notification-bell";
 import { CreditsDisplay } from "@/components/credits-display";
+import { AdminLink } from "@/components/admin-link";
 
 
 export default async function Home() {
@@ -23,14 +24,7 @@ export default async function Home() {
               <Link href={"/"}>fora</Link>
               <Link href={"/market"}>marketplace</Link>
               <Link href={"/map"}>map</Link>
-              {process.env.NODE_ENV === "development" && (
-                <Link
-                  href={"/ml-admin"}
-                  className="text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 rounded"
-                >
-                  🔧 ML Admin
-                </Link>
-              )}
+              <AdminLink />
               <Link href={"/chats"}>my chats</Link>
             </div>
             <div className="flex items-center gap-4">
