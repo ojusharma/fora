@@ -90,6 +90,7 @@ export function CreateListingSection({
     { url: "", alt: "" },
   ]);
   const [tags, setTags] = useState<number[]>([])
+  const [tagInput, setTagInput] = useState("");
   const [availableTags, setAvailableTags] = useState<Array<{ id: number; name: string }>>([]);
   const [filteredTags, setFilteredTags] = useState<Array<{ id: number; name: string }>>([]);
   const [isUploading, setIsUploading] = useState(false);
