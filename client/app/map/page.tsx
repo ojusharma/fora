@@ -496,7 +496,7 @@ export default function MapPage() {
 
                     {listing.compensation && (
                       <p className="text-sm font-semibold">
-                        ${listing.compensation.toLocaleString()}
+                        {listing.compensation.toLocaleString()} Credits
                       </p>
                     )}
 
@@ -602,7 +602,7 @@ export default function MapPage() {
 
                     {selectedListing.compensation && (
                       <p className="text-sm font-semibold mb-2 text-black">
-                        ${selectedListing.compensation.toLocaleString()}
+                        {selectedListing.compensation.toLocaleString()} Credits
                       </p>
                     )}
 

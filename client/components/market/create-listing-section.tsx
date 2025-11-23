@@ -1139,8 +1139,7 @@ function ListingCard({ listing }: { listing: Listing }) {
           )}
           {listing.compensation && (
             <span className="text-sm font-semibold">
-              {Number(listing.compensation).toLocaleString()}
-              {" Credits"}{" "}
+              {Number(listing.compensation).toLocaleString()} Credits
             </span>
           )}
         </CardFooter>

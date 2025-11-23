@@ -93,8 +93,8 @@ const GoogleMapComponent = () => {
                 </p>
               )}
               {selectedListing.compensation && (
-                <p className="text-xs font-medium mb-2">
-                  From {selectedListing.currency} {selectedListing.compensation.toLocaleString()}
+                <p className="text-sm font-semibold mb-2">
+                  {selectedListing.compensation.toLocaleString()} Credits
                 </p>
               )}
               <Link 

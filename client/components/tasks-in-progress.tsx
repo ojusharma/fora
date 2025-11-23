@@ -231,7 +231,7 @@ export function TasksInProgress() {
                 </div>
                 {listing.compensation && (
                   <CardDescription className="font-medium">
-                    ${listing.compensation.toLocaleString()}
+                    {listing.compensation.toLocaleString()} Credits
                   </CardDescription>
                 )}
               </CardHeader>

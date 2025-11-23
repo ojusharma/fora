@@ -9,6 +9,8 @@ import { Suspense, useEffect, useState } from "react";
 import ApplyControls from "@/components/market/apply-controls";
 import ApplicantActions from "@/components/market/applicant-actions";
 import WithdrawButton from "../../../components/market/withdraw-button";
+import { EditListingButton } from "@/components/market/edit-listing-button";
+import { DeleteListingButton } from "@/components/market/delete-listing-button";
 import { ListingDetailTracker } from "@/components/market/listing-detail-tracker";
 import { createClient } from "@/lib/supabase/client";
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
@@ -202,7 +204,26 @@ function MarketDetailContent() {
             ) : null}
 
             <header className="space-y-2">
-              <h1 className="text-2xl font-semibold">{listing.name}</h1>
+              <div className="flex items-start justify-between gap-4">
+                <h1 className="text-2xl font-semibold">{listing.name}</h1>
+                {isPoster && currentUid && (
+                  <div className="flex gap-2">
+                    <EditListingButton
+                      listingId={String(listing.id ?? id)}
+                      currentName={listing.name}
+                      currentDescription={listing.description}
+                      currentDeadline={listing.deadline}
+                      currentCompensation={listing.compensation}
+                      currentUserId={currentUid}
+                    />
+                    <DeleteListingButton
+                      listingId={String(listing.id ?? id)}
+                      listingName={listing.name}
+                      currentUserId={currentUid}
+                    />
+                  </div>
+                )}
+              </div>
               {posterDisplay && (
                 <p className="text-xs text-muted-foreground">Posted by {posterDisplay}</p>
               )}
@@ -217,8 +238,7 @@ function MarketDetailContent() {
                 )}
               {typeof listing.compensation === "number" && (
                 <p className="text-sm font-medium">
-                  From {listing.currency ?? "USD"}{" "}
-                  {listing.compensation.toLocaleString()}
+                  {listing.compensation.toLocaleString()} Credits
                 </p>
               )}
               {listing.deadline && (
