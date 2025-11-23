@@ -121,10 +121,6 @@ export async function ProfileContent({ userId, baseUrl }: ProfileContentProps) {
               <span className="text-sm font-medium">Role</span>
               <Badge variant="secondary">{profile?.role || "user"}</Badge>
             </div>
-            <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
-              <span className="text-sm font-semibold text-green-800 dark:text-green-200">Credits Balance</span>
-              <span className="text-2xl font-bold text-green-600 dark:text-green-400">{profile?.credits || 0}</span>
-            </div>
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Phone</span>
               <span className="text-sm text-muted-foreground">
@@ -157,6 +153,10 @@ export async function ProfileContent({ userId, baseUrl }: ProfileContentProps) {
             <CardDescription>Your platform activity overview</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">Credits Balance</span>
+              <span className="text-2xl font-bold">{profile?.credits || 0}</span>
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Listings Posted</span>
               <span className="text-2xl font-bold">{stats?.num_listings_posted || 0}</span>
