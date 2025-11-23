@@ -1,14 +1,17 @@
 "use client";
+console.log("MAP PAGE MOUNTED");
 
 import { AuthButton } from "@/components/auth-button";
-import { ThemeSwitcher } from "@/components/theme-switcher";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { GoogleMap, LoadScript, Marker, InfoWindow } from '@react-google-maps/api';
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 
 type Listing = {
   id: string;
@@ -21,104 +24,367 @@ type Listing = {
   status: string;
 };
 
-const mapContainerStyle = {
-  width: '100%',
-  height: '100%'
-};
+const mapContainerStyle = { width: "100%", height: "100%" };
+
+// Helper function to calculate distance between two coordinates (Haversine formula)
+function calculateDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
+}
 
 export default function MapPage() {
-  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+
+  const [isAuthChecked, setIsAuthChecked] = useState(false);
   const [listings, setListings] = useState<Listing[]>([]);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [hoveredListing, setHoveredListing] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 40.7128, lng: -74.0060 });
-  const router = useRouter();
+  
+  const [nameFilter, setNameFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
+  const [locationRadius, setLocationRadius] = useState("50"); 
+  const [radiusFilter, setRadiusFilter] = useState("");
+  const [locationCenter, setLocationCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [radiusCenter, setRadiusCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [isGeocodingLocation, setIsGeocodingLocation] = useState(false);
+  const [isGeocodingRadius, setIsGeocodingRadius] = useState(false);
+
+  const cachedListings = useRef<Listing[] | null>(null);
+
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+  });
+
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const onMapLoad = useCallback((map: google.maps.Map) => {
+    mapRef.current = map;
+  }, []);
 
   useEffect(() => {
     async function checkAuth() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      
       if (!user) {
         router.push("/auth/login");
-        return;
       }
-      
-      setIsLoading(false);
+      setIsAuthChecked(true);
     }
-    
     checkAuth();
   }, [router]);
 
   useEffect(() => {
-    const fetchListings = async () => {
+    async function fetchListings() {
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
-        const response = await fetch(`${baseUrl}/api/v1/listings`);
+        const cached = localStorage.getItem('map_listings');
+        if (cached) {
+          const parsedListings = JSON.parse(cached);
+          setListings(parsedListings);
+          const withCoords = parsedListings.filter((l: Listing) => l.latitude && l.longitude);
+          if (withCoords.length > 0) {
+            setMapCenter({
+              lat: withCoords[0].latitude!,
+              lng: withCoords[0].longitude!,
+            });
+          }
+        }
+
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+        const response = await fetch(`${baseUrl}/api/v1/listings`, { cache: "no-store" });
         const data = await response.json();
-        
+
+        console.log('Fetched listings:', data.length);
+        localStorage.setItem('map_listings', JSON.stringify(data));
         setListings(data);
-        const firstWithCoords = data.find((l: Listing) => l.latitude && l.longitude);
-        if (firstWithCoords) {
+
+        const withCoords = data.filter((l: Listing) => l.latitude && l.longitude);
+        if (withCoords.length > 0) {
           setMapCenter({
-            lat: firstWithCoords.latitude!,
-            lng: firstWithCoords.longitude!,
+            lat: withCoords[0].latitude!,
+            lng: withCoords[0].longitude!,
           });
         }
       } catch (error) {
-        console.error('Failed to fetch listings:', error);
+        console.error("Failed to fetch listings:", error);
       }
-    };
+    }
 
-    if (!isLoading) {
+    if (isLoaded) {
       fetchListings();
     }
-  }, [isLoading]);
+  }, [isLoaded]);
 
-  if (isLoading) {
+  useEffect(() => {
+    async function geocodeLocation() {
+      if (!locationFilter || !isLoaded || !window.google) {
+        setLocationCenter(null);
+        return;
+      }
+      
+      setIsGeocodingLocation(true);
+      const geocoder = new window.google.maps.Geocoder();
+      
+      try {
+        const result = await geocoder.geocode({ address: locationFilter });
+        if (result.results && result.results[0]) {
+          const location = result.results[0].geometry.location;
+          const center = {
+            lat: location.lat(),
+            lng: location.lng(),
+          };
+          setLocationCenter(center);
+          setMapCenter(center); 
+        } else {
+          setLocationCenter(null);
+        }
+      } catch (error) {
+        console.error("Location geocoding error:", error);
+        setLocationCenter(null);
+      } finally {
+        setIsGeocodingLocation(false);
+      }
+    }
+
+    const timer = setTimeout(() => {
+      geocodeLocation();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [locationFilter, isLoaded]);
+
+  useEffect(() => {
+    async function geocodeRadiusCenter() {
+      if (!radiusFilter || !isLoaded || !window.google) return;
+      
+      setIsGeocodingRadius(true);
+      const geocoder = new window.google.maps.Geocoder();
+      
+      try {
+        const result = await geocoder.geocode({ address: radiusFilter });
+        if (result.results && result.results[0]) {
+          const location = result.results[0].geometry.location;
+          setRadiusCenter({
+            lat: location.lat(),
+            lng: location.lng(),
+          });
+        } else {
+          setRadiusCenter(null);
+        }
+      } catch (error) {
+        console.error("Geocoding error:", error);
+        setRadiusCenter(null);
+      } finally {
+        setIsGeocodingRadius(false);
+      }
+    }
+
+    const timer = setTimeout(() => {
+      geocodeRadiusCenter();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [radiusFilter, isLoaded]);
+
+  // Filter listings based on all filters
+  const filteredListings = listings.filter((listing) => {
+    // Must have coordinates
+    if (!listing.latitude || !listing.longitude) return false;
+
+    if (nameFilter && !listing.name.toLowerCase().includes(nameFilter.toLowerCase())) {
+      return false;
+    }
+
+    // Location filter (geocoded location with radius)
+    if (locationCenter && locationFilter) {
+      const radius = parseFloat(locationRadius) || 25; // Default 25 km
+      const distance = calculateDistance(
+        locationCenter.lat,
+        locationCenter.lng,
+        listing.latitude,
+        listing.longitude
+      );
+      
+      if (distance > radius) {
+        return false;
+      }
+    }
+
+    // Radius filter
+    if (radiusCenter && radiusFilter) {
+      const [radiusValue, unit] = radiusFilter.split(' ').slice(-2);
+      const radius = parseFloat(radiusValue);
+      
+      if (!isNaN(radius)) {
+        const distance = calculateDistance(
+          radiusCenter.lat,
+          radiusCenter.lng,
+          listing.latitude,
+          listing.longitude
+        );
+        
+        // Convert to miles if needed (1 km = 0.621371 mi)
+        const distanceInUnit = unit?.toLowerCase() === 'mi' ? distance * 0.621371 : distance;
+        
+        if (distanceInUnit > radius) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  });
+
+  const clearFilters = () => {
+    setNameFilter("");
+    setLocationFilter("");
+    setLocationRadius("25");
+    setLocationCenter(null);
+    setRadiusFilter("");
+    setRadiusCenter(null);
+  };
+
+  // Pan to first filtered listing when filters change
+  useEffect(() => {
+    if (filteredListings.length > 0 && (nameFilter || radiusFilter)) {
+      const firstListing = filteredListings[0];
+      if (firstListing.latitude && firstListing.longitude) {
+        setMapCenter({
+          lat: firstListing.latitude,
+          lng: firstListing.longitude,
+        });
+      }
+    }
+  }, [filteredListings.length, nameFilter, radiusFilter]);
+
+  if (!isAuthChecked) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center">
+      <main className="min-h-screen flex items-center justify-center">
         <p>Loading...</p>
       </main>
     );
   }
 
-  const listingsWithCoords = listings.filter(l => l.latitude && l.longitude);
+  const listingsWithCoords = filteredListings;
+  const hasActiveFilters = nameFilter || locationFilter || radiusFilter;
+  
+  console.log('RENDER - listings:', listings.length, 'filtered:', filteredListings.length, 'isLoaded:', isLoaded);
 
   return (
     <div className="h-screen flex flex-col">
-      <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16 flex-shrink-0">
+      {/* NAVBAR */}
+      <nav className="w-full flex justify-center border-b h-16 flex-shrink-0">
         <div className="w-full max-w-none flex justify-between items-center p-3 px-5 text-sm">
           <div className="flex gap-5 items-center font-semibold">
-            <Link href={"/"}>fora</Link>
-            <Link href={"/market"}>marketplace</Link>
-            <Link href={"/map"}>map</Link>
+            <Link href="/">fora</Link>
+            <Link href="/market">marketplace</Link>
+            <Link href="/map">map</Link>
           </div>
           <AuthButton />
         </div>
       </nav>
 
+      {/* MAIN LAYOUT */}
       <div className="flex-1 flex overflow-hidden">
+        {/* LEFT LISTING PANEL */}
         <div className="w-[480px] flex-shrink-0 border-r overflow-y-auto">
           <div className="p-4">
-            <div className="mb-4">
-              <h1 className="text-xl font-semibold mb-1">
-                {listings.length} {listings.length === 1 ? 'listing' : 'listings'} found
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Browse opportunities on the map
-              </p>
+            {/* FILTER SECTION */}
+            <div className="mb-6 p-4 border rounded-lg bg-card space-y-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold">Filters</h2>
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="text-xs"
+                  >
+                    Clear all
+                  </Button>
+                )}
+              </div>
+
+              {/* Name Filter */}
+              <div className="space-y-2">
+                <Label htmlFor="name-filter">Listing Name</Label>
+                <Input
+                  id="name-filter"
+                  type="text"
+                  placeholder="Search by name..."
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
+                />
+              </div>
+
+              {/* Location Filter */}
+              <div className="space-y-2">
+                <Label htmlFor="location-filter">
+                  Location
+                  {isGeocodingLocation && (
+                    <span className="ml-2 text-xs text-muted-foreground">(searching...)</span>
+                  )}
+                </Label>
+                <Input
+                  id="location-filter"
+                  type="text"
+                  placeholder="e.g., New York, NY"
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                />
+                {locationFilter && (
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="location-radius" className="text-xs whitespace-nowrap">
+                      Within
+                    </Label>
+                    <Input
+                      id="location-radius"
+                      type="number"
+                      placeholder="25"
+                      value={locationRadius}
+                      onChange={(e) => setLocationRadius(e.target.value)}
+                      className="w-20 h-8 text-xs"
+                      min="1"
+                    />
+                    <span className="text-xs text-muted-foreground">km</span>
+                  </div>
+                )}
+              </div>
+
+
             </div>
 
+            <h1 className="text-xl font-semibold mb-1">
+              {listingsWithCoords.length} {listingsWithCoords.length === 1 ? "listing" : "listings"} found
+            </h1>
+            <p className="text-sm text-muted-foreground mb-4">
+              Browse opportunities on the map
+            </p>
+
             <div className="space-y-3">
-              {listings.map((listing) => (
+              {filteredListings.map((listing) => (
                 <Card
                   key={listing.id}
                   className={`p-4 cursor-pointer transition-all hover:shadow-md ${
-                    hoveredListing === listing.id ? 'ring-2 ring-primary' : ''
+                    hoveredListing === listing.id ? "ring-2 ring-primary" : ""
                   } ${
-                    selectedListing?.id === listing.id ? 'ring-2 ring-primary bg-accent' : ''
+                    selectedListing?.id === listing.id ? "ring-2 ring-primary bg-accent" : ""
                   }`}
+                  onMouseEnter={() => setHoveredListing(listing.id)}
+                  onMouseLeave={() => setHoveredListing(null)}
                   onClick={() => {
                     if (listing.latitude && listing.longitude) {
                       setSelectedListing(listing);
@@ -127,39 +393,26 @@ export default function MapPage() {
                       router.push(`/market/${listing.id}`);
                     }
                   }}
-                  onMouseEnter={() => setHoveredListing(listing.id)}
-                  onMouseLeave={() => setHoveredListing(null)}
                 >
                   <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-semibold text-base line-clamp-1">{listing.name}</h3>
-                      <Badge variant="secondary" className="flex-shrink-0">
-                        {listing.status}
-                      </Badge>
-                    </div>
-                    
+                    <h3 className="font-semibold text-base line-clamp-1">{listing.name}</h3>
+
                     {listing.description && (
                       <p className="text-sm text-muted-foreground line-clamp-2">
-                        {listing.description} 
+                        {listing.description}
                       </p>
                     )}
-                    
+
                     {listing.compensation && (
-                      <div className="text-sm font-semibold">
+                      <p className="text-sm font-semibold">
                         ${listing.compensation.toLocaleString()}
-                      </div>
+                      </p>
                     )}
-                    
+
                     {listing.location_address && (
-                      <div className="flex items-start gap-1 text-xs text-muted-foreground">
-                        <span>📍</span>
-                        <span className="line-clamp-1">{listing.location_address}</span>
-                      </div>
-                    )}
-                    {!listing.latitude && !listing.longitude && (
-                      <div className="text-xs text-muted-foreground italic">
-                        No map location
-                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-1">
+                        📍 {listing.location_address}
+                      </p>
                     )}
                   </div>
                 </Card>
@@ -167,66 +420,112 @@ export default function MapPage() {
             </div>
           </div>
         </div>
+
+        {/* MAP */}
         <div className="flex-1 relative">
-          <LoadScript googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}>
+          {!isLoaded ? (
+            <div className="w-full h-full flex items-center justify-center">
+              <p>Loading map…</p>
+            </div>
+          ) : (
             <GoogleMap
+              key={listingsWithCoords.length}
               mapContainerStyle={mapContainerStyle}
               center={mapCenter}
               zoom={12}
+              onLoad={onMapLoad}
               options={{
                 streetViewControl: false,
                 mapTypeControl: false,
               }}
             >
-              {listingsWithCoords.map((listing) => (
+              {/* MARKERS */}
+              {listingsWithCoords.map((listing) => {
+                console.log('Rendering marker:', listing.name, listing.latitude, listing.longitude);
+                return (
+                  <Marker
+                    key={listing.id}
+                    position={{ lat: listing.latitude!, lng: listing.longitude! }}
+                    onClick={() => setSelectedListing(listing)}
+                    icon={{
+                      path: window.google?.maps?.SymbolPath?.CIRCLE,
+                      scale:
+                        hoveredListing === listing.id ||
+                        selectedListing?.id === listing.id
+                          ? 12
+                          : 8,
+                      fillColor:
+                        selectedListing?.id === listing.id ? "#2563eb" : "#3b82f6",
+                      fillOpacity: 1,
+                      strokeColor: "#ffffff",
+                      strokeWeight: 2,
+                    }}
+                  />
+                );
+              })}
+
+              {/* Radius Center Marker */}
+              {radiusCenter && (
                 <Marker
-                  key={listing.id}
-                  position={{ lat: listing.latitude!, lng: listing.longitude! }}
-                  onClick={() => setSelectedListing(listing)}
+                  position={radiusCenter}
                   icon={{
                     path: window.google?.maps?.SymbolPath?.CIRCLE,
-                    scale: hoveredListing === listing.id || selectedListing?.id === listing.id ? 12 : 8,
-                    fillColor: selectedListing?.id === listing.id ? '#2563eb' : '#3b82f6',
-                    fillOpacity: 1,
-                    strokeColor: '#ffffff',
+                    scale: 10,
+                    fillColor: "#ef4444",
+                    fillOpacity: 0.8,
+                    strokeColor: "#ffffff",
                     strokeWeight: 2,
                   }}
                 />
-              ))}
-              
+              )}
+
+              {locationCenter && (
+                <Marker
+                  position={locationCenter}
+                  icon={{
+                    path: window.google?.maps?.SymbolPath?.CIRCLE,
+                    scale: 10,
+                    fillColor: "#22c55e",
+                    fillOpacity: 0.8,
+                    strokeColor: "#ffffff",
+                    strokeWeight: 2,
+                  }}
+                />
+              )}
+
               {selectedListing && selectedListing.latitude && selectedListing.longitude && (
                 <InfoWindow
-                  position={{ lat: selectedListing.latitude, lng: selectedListing.longitude }}
+                  position={{
+                    lat: selectedListing.latitude,
+                    lng: selectedListing.longitude,
+                  }}
                   onCloseClick={() => setSelectedListing(null)}
                 >
-                  <div className="p-2 max-w-xs">
-                    <h3 className="font-semibold text-sm mb-1">{selectedListing.name}</h3>
+                  <div className="p-3 max-w-sm">
+                    <h3 className="font-semibold text-base mb-2 text-black">{selectedListing.name}</h3>
+
                     {selectedListing.description && (
-                      <p className="text-xs text-gray-600 mb-2 line-clamp-2">
+                      <p className="text-sm text-gray-700 mb-3">
                         {selectedListing.description}
                       </p>
                     )}
+
                     {selectedListing.compensation && (
-                      <p className="text-xs font-medium mb-2">
+                      <p className="text-sm font-semibold mb-2 text-black">
                         ${selectedListing.compensation.toLocaleString()}
                       </p>
                     )}
+
                     {selectedListing.location_address && (
-                      <p className="text-xs text-gray-600 mb-2 line-clamp-1">
+                      <p className="text-sm text-gray-600 mb-3">
                         📍 {selectedListing.location_address}
                       </p>
                     )}
-                    <Link 
-                      href={`/market/${selectedListing.id}`}
-                      className="text-xs text-blue-600 hover:underline font-medium"
-                    >
-                      View details →
-                    </Link>
                   </div>
                 </InfoWindow>
               )}
             </GoogleMap>
-          </LoadScript>
+          )}
         </div>
       </div>
     </div>

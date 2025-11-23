@@ -21,11 +21,14 @@ const geistSans = Geist({
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
+  const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
   return (
     <html lang="en" suppressHydrationWarning>
+      <head></head>
       <body className={`${geistSans.className} antialiased`}>
         <ThemeProvider
           attribute="class"

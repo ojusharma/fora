@@ -100,6 +100,26 @@ export function CreateListingSection({
   );
   const [userId, setUserId] = useState<string | null>(null);
 
+  // Merge incoming listings into existing list, keeping incoming first and
+  // removing duplicates by `id`.
+  function mergeUnique(incoming: Listing[], existing: Listing[]) {
+    const seen = new Set<string>();
+    const out: Listing[] = [];
+    for (const l of incoming) {
+      if (!seen.has(l.id)) {
+        seen.add(l.id);
+        out.push(l);
+      }
+    }
+    for (const l of existing) {
+      if (!seen.has(l.id)) {
+        seen.add(l.id);
+        out.push(l);
+      }
+    }
+    return out;
+  }
+
   // Fetch display names for poster_uids and populate seller + myListings
   React.useEffect(() => {
     let mounted = true;
@@ -150,7 +170,7 @@ export function CreateListingSection({
           nameByUid[String(uid)] = display;
         });
 
-        // update market listings
+        // update market listings and hide current user's listings from the marketplace
         const updatedMarket = listings.map((l) => ({
           ...l,
           seller: l.poster_uid && nameByUid[l.poster_uid] ? nameByUid[l.poster_uid] : l.seller,
@@ -159,8 +179,11 @@ export function CreateListingSection({
         // also populate myListings for listings posted by current user
         const mine = updatedMarket.filter((l) => currentUid && l.poster_uid === currentUid) as Listing[];
 
-        setMarketListings(updatedMarket);
-        if (mine.length > 0) setMyListings((prev) => [...mine, ...prev]);
+        // marketplace should NOT include listings posted by the signed-in user
+        const marketForViewer = updatedMarket.filter((l) => !(currentUid && l.poster_uid === currentUid));
+
+        setMarketListings(marketForViewer);
+        if (mine.length > 0) setMyListings((prev) => mergeUnique(mine, prev));
       } catch (err) {
         // ignore enrichment errors
         console.error("Failed to enrich listings with user profiles", err);
@@ -315,8 +338,11 @@ export function CreateListingSection({
         poster_uid: user.id,
       };
 
-      setMyListings((prev) => [newListing, ...prev]);
-      setMarketListings((prev) => [newListing, ...prev]);
+      setMyListings((prev) => mergeUnique([newListing], prev));
+      // Do not add the user's own new listing to the marketplace view for that user
+      if (!user || newListing.poster_uid !== user.id) {
+        setMarketListings((prev) => mergeUnique([newListing], prev));
+      }
       setName("");
       setCompensation("");
       setCurrency("USD");

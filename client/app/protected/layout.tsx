@@ -16,7 +16,8 @@ export default function ProtectedLayout({
             <div className="flex gap-5 items-center font-semibold">
               <Link href={"/"}>fora</Link>
               <Link href={"/market"}>marketplace</Link>
-              <Link href={"/map"}>map</Link>
+               <Link href={"/map"}>map</Link>
+               <Link href={"/chats"}>my chats</Link>
             </div>
             <Suspense>
               <AuthButton />
