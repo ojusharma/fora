@@ -7,6 +7,7 @@ import { PostedTasksInProgress } from "@/components/posted-tasks-in-progress";
 import Link from "next/link";
 import { Suspense } from "react";
 import { NotificationBell } from "@/components/notification-bell";
+import { CreditsDisplay } from "@/components/credits-display";
 
 
 export default async function Home() {
@@ -33,6 +34,9 @@ export default async function Home() {
               <Link href={"/chats"}>my chats</Link>
             </div>
             <div className="flex items-center gap-4">
+  <Suspense>
+    <CreditsDisplay />
+  </Suspense>
   <Suspense>
     <NotificationBell />
   </Suspense>

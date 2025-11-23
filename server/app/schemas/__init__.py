@@ -41,6 +41,16 @@ from app.schemas.admin import (
     AdminStats,
     AdminUserStats,
 )
+from app.schemas.reward import (
+    RewardBase,
+    RewardCreate,
+    RewardUpdate,
+    RewardResponse,
+    RewardClaimBase,
+    RewardClaimCreate,
+    RewardClaimResponse,
+    UserRewardClaimHistory,
+)
 
 __all__ = [
     # User Stats
@@ -79,6 +89,15 @@ __all__ = [
     "ListingDeleteResponse",
     "AdminStats",
     "AdminUserStats",
+    # Rewards
+    "RewardBase",
+    "RewardCreate",
+    "RewardUpdate",
+    "RewardResponse",
+    "RewardClaimBase",
+    "RewardClaimCreate",
+    "RewardClaimResponse",
+    "UserRewardClaimHistory",
 ]
 
 from .notification import NotificationBase, NotificationCreate, NotificationOut

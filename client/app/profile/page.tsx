@@ -7,6 +7,7 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { ProfileContent } from "@/components/profile/profile-content";
 import { ProfileSkeleton } from "@/components/profile/profile-skeleton";
 import { NotificationBell } from "@/components/notification-bell";
+import { CreditsDisplay } from "@/components/credits-display";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -31,6 +32,9 @@ export default async function ProfilePage() {
               <Link href={"/chats"}>chats</Link>
             </div>
             <div className="flex items-center gap-4">
+  <Suspense>
+    <CreditsDisplay />
+  </Suspense>
   <Suspense>
     <NotificationBell />
   </Suspense>

@@ -6,6 +6,7 @@ import { notFound, redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import ChatsApp from '@/components/chats/chats-app'
 import { NotificationBell } from '@/components/notification-bell'
+import { CreditsDisplay } from '@/components/credits-display'
 
 export default async function Page({ searchParams }: { searchParams?: { listing?: string } }) {
   const supabase = await createClient()
@@ -77,6 +78,9 @@ export default async function Page({ searchParams }: { searchParams?: { listing?
               <Link href={'/chats'}>my chats</Link>
             </div>
             <div className="flex items-center gap-4">
+  <Suspense>
+    <CreditsDisplay />
+  </Suspense>
   <Suspense>
     <NotificationBell />
   </Suspense>

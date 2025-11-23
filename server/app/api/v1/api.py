@@ -16,6 +16,7 @@ from app.api.v1.endpoints import (
     chats,
     notifications,
     ratings,
+    reward,
 )
 from app.api.v1 import admin
 
@@ -45,4 +46,6 @@ api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(chats.router, prefix="/chats", tags=["chats"])
 
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+
+api_router.include_router(reward.router, prefix="/rewards", tags=["rewards"])
  
