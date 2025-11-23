@@ -57,28 +57,25 @@ export function TasksInProgress() {
         const uid = data.user.id;
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
-        // Fetch user's applications with status "shortlisted" and "pending_confirmation"
-        const [shortlistedRes, pendingRes] = await Promise.all([
-          fetch(`${baseUrl}/api/v1/listings/user/${uid}/with-listings?status=shortlisted`, { cache: "no-store" }),
-          fetch(`${baseUrl}/api/v1/listings/user/${uid}/with-listings?status=pending_confirmation`, { cache: "no-store" })
+        // Fetch listings where user is assignee with status "in_progress" and "pending_confirmation"
+        const [inProgressRes, pendingRes] = await Promise.all([
+          fetch(`${baseUrl}/api/v1/listings?assignee_uid=${uid}&status=in_progress`, { cache: "no-store" }),
+          fetch(`${baseUrl}/api/v1/listings?assignee_uid=${uid}&status=pending_confirmation`, { cache: "no-store" })
         ]);
 
-        if (shortlistedRes.ok || pendingRes.ok) {
-          const shortlisted = shortlistedRes.ok ? await shortlistedRes.json() : [];
-          const pending = pendingRes.ok ? await pendingRes.json() : [];
-          const applications = [...shortlisted, ...pending];
-          
-          // Filter to ensure we have the listing data
-          const validTasks = applications.filter((app: any) => app.listing || app.listings);
-          
-          // Normalize the data structure
-          const normalizedTasks = validTasks.map((app: any) => ({
-            ...app,
-            listing: app.listing || app.listings,
-          }));
-          
-          setTasks(normalizedTasks);
-        }
+        const inProgressListings = inProgressRes.ok ? await inProgressRes.json() : [];
+        const pendingListings = pendingRes.ok ? await pendingRes.json() : [];
+        const allListings = [...inProgressListings, ...pendingListings];
+        
+        // Convert to Task format
+        const normalizedTasks = allListings.map((listing: any) => ({
+          listing_id: listing.id,
+          status: listing.status,
+          applied_at: listing.created_at,
+          listing: listing
+        }));
+        
+        setTasks(normalizedTasks);
       } catch (err) {
         console.error("Failed to load tasks in progress:", err);
       } finally {
