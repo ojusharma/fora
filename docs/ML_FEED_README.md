@@ -1,8 +1,6 @@
 # Building Our Personalized Feed with Machine Learning
 
-Hey team! 👋
-
-So we've built a pretty cool ML-powered recommendation system for our marketplace. Think of it like how Netflix recommends shows or Spotify suggests songs, but for our listings. The system learns what each user likes and shows them the most relevant stuff first.
+We've built a  ML-powered recommendation system for our marketplace. Think of it like how Netflix recommends shows or Spotify suggests songs, but for our listings. The system learns what each user likes and shows them the most relevant stuff first.
 
 ## What Does It Do?
 
