@@ -14,6 +14,7 @@ from app.api.v1.endpoints import (
     user_preferences,
     listing_applicants,
 )
+from app.api.v1 import admin
 
 api_router = APIRouter()
 
@@ -29,3 +30,4 @@ api_router.include_router(
 api_router.include_router(
     listing_applicants.router, prefix="/applicants", tags=["applicants"]
 )
+api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
