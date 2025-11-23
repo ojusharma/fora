@@ -39,12 +39,27 @@ class ListingCRUD:
         listing_data = listing.model_dump()
         listing_data["poster_uid"] = str(poster_uid)
         
+        # Extract tags before inserting listing
+        tags = listing_data.pop("tags", [])
+        
         # Convert datetime to ISO string
         if listing_data.get("deadline"):
             listing_data["deadline"] = listing_data["deadline"].isoformat()
 
         response = self.supabase.table("listings").insert(listing_data).execute()
-        return response.data[0] if response.data else None
+        created_listing = response.data[0] if response.data else None
+        
+        # Insert tags into listing_tags table
+        if created_listing and tags:
+            listing_id = created_listing["id"]
+            tag_entries = [
+                {"listing_id": listing_id, "tag_id": tag_id}
+                for tag_id in tags
+            ]
+            self.supabase.table("listing_tags").insert(tag_entries).execute()
+            created_listing["tags"] = tags
+        
+        return created_listing
 
     async def get_listing(self, listing_id: UUID) -> Optional[Dict[str, Any]]:
         """
@@ -62,7 +77,19 @@ class ListingCRUD:
             .eq("id", str(listing_id))
             .execute()
         )
-        return response.data[0] if response.data else None
+        listing = response.data[0] if response.data else None
+        
+        # Fetch tags for this listing
+        if listing:
+            tags_response = (
+                self.supabase.table("listing_tags")
+                .select("tag_id")
+                .eq("listing_id", str(listing_id))
+                .execute()
+            )
+            listing["tags"] = [tag["tag_id"] for tag in tags_response.data] if tags_response.data else []
+        
+        return listing
 
     async def get_listings(self, filters: ListingFilters) -> List[Dict[str, Any]]:
         """

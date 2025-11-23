@@ -2,6 +2,7 @@
 
 import { AuthButton } from "@/components/auth-button";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { notFound, redirect, useParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -24,6 +25,7 @@ export default function Page() {
   const [applicants, setApplicants] = useState<any[]>([]);
   const [myApplication, setMyApplication] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [tagNames, setTagNames] = useState<string[]>([]);
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
@@ -54,6 +56,23 @@ export default function Page() {
 
       const listingData = await res.json();
       setListing(listingData);
+      if (listingData.tags && Array.isArray(listingData.tags) && listingData.tags.length > 0) {
+        try {
+          const tagPromises = listingData.tags.map((tagId: number) =>
+            fetch(`${baseUrl}/api/v1/tags/${tagId}`).then(async (r) => {
+              if (r.ok) {
+                const tag = await r.json();
+                return tag.name;
+              }
+              return null;
+            })
+          );
+          const names = await Promise.all(tagPromises);
+          setTagNames(names.filter((name): name is string => name !== null));
+        } catch (err) {
+          console.error("Failed to fetch tag names:", err);
+        }
+      }
 
       // Fetch poster profile
       try {
@@ -177,7 +196,6 @@ export default function Page() {
               {posterDisplay && (
                 <p className="text-xs text-muted-foreground">Posted by {posterDisplay}</p>
               )}
-                {/* Apply/Ignore controls for users who are not the poster and who haven't applied */}
                 {!isPoster && currentUid && !myApplication && (
                   <div className="pt-2">
                     <ApplyControls
@@ -202,6 +220,15 @@ export default function Page() {
                 <p className="text-xs text-muted-foreground">
                   {listing.location_address}
                 </p>
+              )}
+              {tagNames.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {tagNames.map((tagName, index) => (
+                    <Badge key={index} variant="secondary">
+                      {tagName}
+                    </Badge>
+                  ))}
+                </div>
               )}
             </header>
 
