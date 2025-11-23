@@ -9,6 +9,7 @@ from datetime import datetime
 
 from app.core.config import get_settings
 from app.api.v1.api import api_router
+from app.ml.scheduler import start_ml_scheduler, stop_ml_scheduler
 
 # Get application settings
 settings = get_settings()
@@ -24,6 +25,15 @@ async def lifespan(app: FastAPI):
     print("Supabase connection initialized")
     print(f"API documentation: http://localhost:8000/docs")
     print(f"API v1 prefix: {settings.api_v1_prefix}")
+    
+    # Start ML background scheduler
+    print("Starting ML recommendation engine...")
+    try:
+        start_ml_scheduler()
+        print("✓ ML scheduler started successfully")
+    except Exception as e:
+        print(f"✗ Failed to start ML scheduler: {e}")
+    
     print("Server ready to accept requests")
     print("=" * 50)
     
@@ -31,6 +41,11 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     print(f"Shutting down {settings.app_name}...")
+    try:
+        stop_ml_scheduler()
+        print("✓ ML scheduler stopped")
+    except Exception as e:
+        print(f"✗ Error stopping ML scheduler: {e}")
 
 
 # Initialize FastAPI app

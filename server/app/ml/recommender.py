@@ -173,6 +173,13 @@ class RecommendationEngine:
         if current_time is None:
             current_time = datetime.utcnow()
         
+        # Ensure both datetimes are timezone-aware or both naive
+        if created_at.tzinfo is not None and current_time.tzinfo is None:
+            from datetime import timezone
+            current_time = current_time.replace(tzinfo=timezone.utc)
+        elif created_at.tzinfo is None and current_time.tzinfo is not None:
+            created_at = created_at.replace(tzinfo=None)
+        
         age_days = (current_time - created_at).total_seconds() / 86400
         
         # Exponential decay over 30 days

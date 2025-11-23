@@ -182,16 +182,63 @@ class FeedCRUD:
         Returns:
             List of tag IDs
         """
-        # Call database function
-        response = self.supabase.rpc(
-            "get_user_preferred_tags",
-            {
-                "user_uuid": str(user_uid),
-                "limit_count": limit
-            }
-        ).execute()
-        
-        return response.data if response.data else []
+        try:
+            # Try to call database function if it exists
+            response = self.supabase.rpc(
+                "get_user_preferred_tags",
+                {
+                    "user_uuid": str(user_uid),
+                    "limit_count": limit
+                }
+            ).execute()
+            
+            return response.data if response.data else []
+        except Exception as e:
+            # Fallback: Get tags from recent interactions manually
+            try:
+                # Get user's recent interactions
+                interactions = (
+                    self.supabase.table("user_interactions")
+                    .select("listing_id")
+                    .eq("user_uid", str(user_uid))
+                    .in_("interaction_type", ["view", "click", "apply", "save"])
+                    .order("interaction_time", desc=True)
+                    .limit(100)
+                    .execute()
+                )
+                
+                if not interactions.data:
+                    return []
+                
+                # Get listing IDs
+                listing_ids = [i["listing_id"] for i in interactions.data]
+                
+                # Fetch tags from these listings
+                listings = (
+                    self.supabase.table("listings")
+                    .select("tags")
+                    .in_("id", listing_ids)
+                    .execute()
+                )
+                
+                if not listings.data:
+                    return []
+                
+                # Count tag occurrences
+                tag_counts = {}
+                for listing in listings.data:
+                    if listing.get("tags"):
+                        for tag in listing["tags"]:
+                            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+                
+                # Sort by frequency and return top tags
+                sorted_tags = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)
+                return [tag_id for tag_id, count in sorted_tags[:limit]]
+                
+            except Exception as fallback_error:
+                # If everything fails, return empty list
+                print(f"Error fetching preferred tags: {fallback_error}")
+                return []
 
     # ==================== PERSONALIZED FEED ====================
 

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { usePersonalizedFeed } from "@/hooks/use-personalized-feed";
 
 type Props = {
   listingId: string;
@@ -14,6 +15,8 @@ export default function ApplyControls({ listingId, posterUid, currentUserId }: P
   const [ignored, setIgnored] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { trackApply, trackDismiss } = usePersonalizedFeed({ autoFetch: false });
 
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -47,6 +50,9 @@ export default function ApplyControls({ listingId, posterUid, currentUserId }: P
         throw new Error(msg);
       }
       setApplied(true);
+      
+      // Track apply interaction for ML
+      await trackApply(listingId);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -54,8 +60,11 @@ export default function ApplyControls({ listingId, posterUid, currentUserId }: P
     }
   }
 
-  function handleIgnore() {
+  async function handleIgnore() {
     setIgnored(true);
+    
+    // Track dismiss interaction for ML
+    await trackDismiss(listingId);
   }
 
   if (ignored) {

@@ -234,7 +234,6 @@ export function CreateListingSection({
           if (!p) return;
           const uid = p.uid ?? p.id ?? null;
           if (!uid) return;
-          // prefer a display field if present, fall back to phone or short uid
           const display = p.display_name ?? p.full_name ?? p.phone ?? String(uid).slice(0, 8);
           nameByUid[String(uid)] = display;
         });
@@ -595,6 +594,7 @@ export function CreateListingSection({
       if (!user || newListing.poster_uid !== user.id) {
         setMarketListings((prev) => mergeUnique([newListing], prev));
       }
+      
       setName("");
       setCompensation("");
       setCurrency("USD");
