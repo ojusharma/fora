@@ -1,12 +1,28 @@
-"""Admin endpoints for ML model training and testing."""
-from fastapi import APIRouter, HTTPException
+"""Admin endpoints for ML model training, testing, and user/listing management."""
+from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel
-from typing import Literal
+from typing import Literal, List, Tuple
+from uuid import UUID
 import logging
 
 from app.ml.training import MLTrainingService
 from app.ml.sample_data_generator import generate_sample_data
 from app.core.database import get_supabase_client
+from app.core.deps import require_admin
+from app.crud.admin import AdminCRUD
+from app.schemas.admin import (
+    AdminUserUpdate,
+    AdminUserCreate,
+    AdminListingUpdate,
+    AdminListingCreate,
+    UserDeleteResponse,
+    ListingDeleteResponse,
+    AdminStats,
+    AdminUserStats,
+)
+from app.schemas.user import UserProfileResponse
+from app.schemas.listing import ListingResponse
+from supabase import Client
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -14,6 +30,18 @@ logger = logging.getLogger(__name__)
 
 class TrainingRequest(BaseModel):
     task_type: Literal["daily", "hourly", "frequent"]
+
+
+class RoleChangeRequest(BaseModel):
+    """Request to change a user's role."""
+    new_role: Literal["user", "moderator", "admin"]
+
+
+# ==================== DEPENDENCIES ====================
+
+def get_admin_crud(supabase: Client = Depends(get_supabase_client)) -> AdminCRUD:
+    """Dependency to get AdminCRUD instance."""
+    return AdminCRUD(supabase)
 
 
 @router.post("/train-ml")
@@ -133,3 +161,269 @@ async def generate_sample_data_endpoint():
         raise HTTPException(
             status_code=500, detail=f"Sample data generation failed: {str(e)}"
         )
+
+
+# ==================== USER MANAGEMENT ENDPOINTS ====================
+
+@router.get("/users", response_model=List[UserProfileResponse])
+async def get_all_users(
+    skip: int = 0,
+    limit: int = 100,
+    role: str = None,
+    admin_user: Tuple[UUID, dict] = Depends(require_admin),
+    crud: AdminCRUD = Depends(get_admin_crud),
+):
+    """
+    Get all users with optional filtering by role.
+    Requires admin privileges.
+    """
+    try:
+        users = await crud.get_all_users(skip=skip, limit=limit, role=role)
+        return users
+    except Exception as e:
+        logger.error(f"Failed to fetch users: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/users/{user_uid}", response_model=UserProfileResponse)
+async def get_user(
+    user_uid: UUID,
+    admin_user: Tuple[UUID, dict] = Depends(require_admin),
+    crud: AdminCRUD = Depends(get_admin_crud),
+):
+    """
+    Get a specific user by UID.
+    Requires admin privileges.
+    """
+    try:
+        user = await crud.get_user_by_id(user_uid)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return user
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch user: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/users/{user_uid}", response_model=UserProfileResponse)
+async def update_user(
+    user_uid: UUID,
+    update_data: AdminUserUpdate,
+    admin_user: Tuple[UUID, dict] = Depends(require_admin),
+    crud: AdminCRUD = Depends(get_admin_crud),
+):
+    """
+    Update a user's profile.
+    Admin can update any field including role and credits.
+    Requires admin privileges.
+    """
+    try:
+        updated_user = await crud.update_user(user_uid, update_data)
+        return updated_user
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to update user: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/users/{user_uid}", response_model=UserDeleteResponse)
+async def delete_user(
+    user_uid: UUID,
+    admin_user: Tuple[UUID, dict] = Depends(require_admin),
+    crud: AdminCRUD = Depends(get_admin_crud),
+):
+    """
+    Delete a user and all associated data.
+    This will cascade delete all user's listings, applications, etc.
+    Requires admin privileges.
+    """
+    try:
+        success = await crud.delete_user(user_uid)
+        if not success:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return UserDeleteResponse(
+            success=True,
+            message="User successfully deleted",
+            deleted_uid=user_uid
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete user: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/users/{user_uid}/role", response_model=UserProfileResponse)
+async def change_user_role(
+    user_uid: UUID,
+    role_data: RoleChangeRequest,
+    admin_user: Tuple[UUID, dict] = Depends(require_admin),
+    crud: AdminCRUD = Depends(get_admin_crud),
+):
+    """
+    Change a user's role (user, moderator, admin).
+    Requires admin privileges.
+    """
+    try:
+        updated_user = await crud.change_user_role(user_uid, role_data.new_role)
+        return updated_user
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to change user role: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== LISTING MANAGEMENT ENDPOINTS ====================
+
+@router.get("/listings", response_model=List[ListingResponse])
+async def get_all_listings(
+    skip: int = 0,
+    limit: int = 100,
+    status: str = None,
+    admin_user: Tuple[UUID, dict] = Depends(require_admin),
+    crud: AdminCRUD = Depends(get_admin_crud),
+):
+    """
+    Get all listings with optional filtering by status.
+    Requires admin privileges.
+    """
+    try:
+        listings = await crud.get_all_listings(skip=skip, limit=limit, status=status)
+        return listings
+    except Exception as e:
+        logger.error(f"Failed to fetch listings: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/listings/{listing_id}", response_model=ListingResponse)
+async def get_listing(
+    listing_id: UUID,
+    admin_user: Tuple[UUID, dict] = Depends(require_admin),
+    crud: AdminCRUD = Depends(get_admin_crud),
+):
+    """
+    Get a specific listing by ID.
+    Requires admin privileges.
+    """
+    try:
+        listing = await crud.get_listing_by_id(listing_id)
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
+        return listing
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch listing: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/listings", response_model=ListingResponse, status_code=status.HTTP_201_CREATED)
+async def create_listing(
+    listing_data: AdminListingCreate,
+    admin_user: Tuple[UUID, dict] = Depends(require_admin),
+    crud: AdminCRUD = Depends(get_admin_crud),
+):
+    """
+    Create a listing on behalf of a user.
+    Requires admin privileges.
+    """
+    try:
+        created_listing = await crud.create_listing(listing_data)
+        return created_listing
+    except Exception as e:
+        logger.error(f"Failed to create listing: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/listings/{listing_id}", response_model=ListingResponse)
+async def update_listing(
+    listing_id: UUID,
+    update_data: AdminListingUpdate,
+    admin_user: Tuple[UUID, dict] = Depends(require_admin),
+    crud: AdminCRUD = Depends(get_admin_crud),
+):
+    """
+    Update a listing.
+    Admin can update any field including poster, assignee, status.
+    Requires admin privileges.
+    """
+    try:
+        updated_listing = await crud.update_listing(listing_id, update_data)
+        return updated_listing
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to update listing: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/listings/{listing_id}", response_model=ListingDeleteResponse)
+async def delete_listing(
+    listing_id: UUID,
+    admin_user: Tuple[UUID, dict] = Depends(require_admin),
+    crud: AdminCRUD = Depends(get_admin_crud),
+):
+    """
+    Delete a listing.
+    Requires admin privileges.
+    """
+    try:
+        success = await crud.delete_listing(listing_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Listing not found")
+        
+        return ListingDeleteResponse(
+            success=True,
+            message="Listing successfully deleted",
+            deleted_id=listing_id
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete listing: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== STATISTICS ENDPOINTS ====================
+
+@router.get("/stats", response_model=AdminStats)
+async def get_platform_stats(
+    admin_user: Tuple[UUID, dict] = Depends(require_admin),
+    crud: AdminCRUD = Depends(get_admin_crud),
+):
+    """
+    Get overall platform statistics.
+    Requires admin privileges.
+    """
+    try:
+        stats = await crud.get_platform_stats()
+        return stats
+    except Exception as e:
+        logger.error(f"Failed to fetch platform stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/stats/users/{user_uid}", response_model=AdminUserStats)
+async def get_user_stats(
+    user_uid: UUID,
+    admin_user: Tuple[UUID, dict] = Depends(require_admin),
+    crud: AdminCRUD = Depends(get_admin_crud),
+):
+    """
+    Get detailed statistics for a specific user.
+    Requires admin privileges.
+    """
+    try:
+        stats = await crud.get_user_stats(user_uid)
+        return stats
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to fetch user stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
