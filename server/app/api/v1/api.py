@@ -14,7 +14,7 @@ from app.api.v1.endpoints import (
     user_preferences,
     listing_applicants,
     chats,
-    notifications
+    notifications,
     ratings,
 )
 from app.api.v1 import admin
