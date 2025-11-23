@@ -77,7 +77,7 @@ async def apply_to_listing(
                 user_uid=listing["poster_uid"],
                 title="New application received",
                 body=f"Someone applied to your listing '{listing['name']}'",
-                metadata={"redirect_url": f"/market/listing/{listing_id}"}
+                metadata={"redirect_url": f"/market/{listing_id}"}
             )
         )
 

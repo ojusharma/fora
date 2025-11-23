@@ -379,34 +379,40 @@ class ListingApplicantsCRUD:
         )
 
     async def shortlist_applicant(self, listing_id: UUID, applicant_uid: UUID):
-    # Find existing application
-        result = await self.get_application(listing_id, applicant_uid)
-        if not result:
-            return None
+            # Find existing application
+            result = await self.get_application(listing_id, applicant_uid)
+            if not result:
+                return None
 
-        # Update status
-        updated = (
-            self.supabase.table("listing_applicants")
-            .update({"status": "shortlisted"})
-            .eq("listing_id", str(listing_id))
-            .eq("applicant_uid", str(applicant_uid))
-            .execute()
-        )
+            # Update application status
+            updated = (
+                self.supabase.table("listing_applicants")
+                .update({"status": "shortlisted"})
+                .eq("listing_id", str(listing_id))
+                .eq("applicant_uid", str(applicant_uid))
+                .execute()
+            )
 
-        if not updated.data:
-            return None
+            if not updated.data:
+                return None
 
-        # Load listing (title + poster)
-        listing = await ListingCRUD(self.supabase).get_listing(listing_id)
+            # ⭐ Assign shortlisted applicant to the listing
+            self.supabase.table("listings").update({
+                "assignee_uid": str(applicant_uid)
+            }).eq("id", str(listing_id)).execute()
 
-        # Notify applicant
-        await self._send_notification(
-            user_uid=str(applicant_uid),
-            message=f"Your application for '{listing['name']}' was shortlisted.",
-            redirect_url=f"/market/{listing_id}"
-        )
+            # Load listing
+            listing = await ListingCRUD(self.supabase).get_listing(listing_id)
 
-        return updated.data[0]
+            # Notify applicant
+            await self._send_notification(
+                user_uid=str(applicant_uid),
+                message=f"Your application for '{listing['name']}' was shortlisted.",
+                redirect_url=f"/market/{listing_id}"
+            )
+
+            return updated.data[0]
+
 
     async def reject_applicant(self, listing_id: UUID, applicant_uid: UUID):
         result = await self.get_application(listing_id, applicant_uid)
