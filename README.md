@@ -414,42 +414,10 @@ See full API documentation at `/docs` when running the server.
 
 ### Production Deployment
 
-**Live Application**: [https://fora-web.azurewebsites.net/](https://fora-web.azurewebsites.net/)
+**Live Application**: [https://fora-lime.vercel.app/](https://fora-lime.vercel.app/)
 
-Fora is deployed on **Azure App Service** in the Canada Central region, using Infrastructure as Code (IaC) with ARM templates.
+Fora backend is deployed on **Azure App Service** in the Canada Central region, using Infrastructure as Code (IaC) with ARM templates.
 
-#### Azure Resources
-
-- **App Service**: `fora-web` (Linux, Next.js)
-- **Resource Group**: `fora-rg`
-- **Region**: Canada Central
-- **Managed Identity**: User-assigned identity for secure resource access
-
-#### Deployment via ARM Templates
-
-ARM templates are located in the `devops/` directory:
-
-```bash
-# Deploy web app
-az deployment group create \
-  --resource-group fora-rg \
-  --template-file devops/fora-web-arm.json
-
-# Deploy supporting infrastructure
-az deployment group create \
-  --resource-group fora-rg \
-  --template-file devops/fora-prod-arm.json
-```
-
-#### Environment Variables (Azure App Service)
-
-Configure the following in Azure Portal → App Service → Configuration:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
-SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
-GOOGLE_MAPS_API_KEY=<your-google-maps-key>
 ```
 
 ### Local Deployment Options
