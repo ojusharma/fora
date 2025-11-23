@@ -545,8 +545,7 @@ export default function MapPage() {
                         selectedListing?.id === listing.id
                           ? 12
                           : 8,
-                      fillColor:
-                        selectedListing?.id === listing.id ? "#2563eb" : "#3b82f6",
+                      fillColor: "#AA4A44",
                       fillOpacity: 1,
                       strokeColor: "#ffffff",
                       strokeWeight: 2,

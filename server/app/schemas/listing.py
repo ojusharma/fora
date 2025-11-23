@@ -74,6 +74,7 @@ class ListingResponse(ListingBase):
 class ListingFilters(BaseModel):
     """Schema for filtering listings."""
     status: Optional[ListingStatus] = None
+    exclude_status: Optional[ListingStatus] = None
     poster_uid: Optional[UUID] = None
     assignee_uid: Optional[UUID] = None
     tags: Optional[List[int]] = None

@@ -64,6 +64,7 @@ async def create_listing(
 )
 async def get_listings(
     status_filter: Optional[ListingStatus] = Query(None, alias="status"),
+    exclude_status: Optional[ListingStatus] = None,
     poster_uid: Optional[UUID] = None,
     assignee_uid: Optional[UUID] = None,
     min_compensation: Optional[float] = None,
@@ -77,6 +78,7 @@ async def get_listings(
     Get listings with optional filters.
     
     - **status**: Filter by listing status
+    - **exclude_status**: Exclude listings with this status
     - **poster_uid**: Filter by poster user ID
     - **assignee_uid**: Filter by assignee user ID
     - **min_compensation**: Minimum compensation
@@ -87,6 +89,7 @@ async def get_listings(
     """
     filters = ListingFilters(
         status=status_filter,
+        exclude_status=exclude_status,
         poster_uid=poster_uid,
         assignee_uid=assignee_uid,
         min_compensation=min_compensation,
@@ -182,6 +185,11 @@ async def confirm_task_completion(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Listing not found",
         )
+    
+    # Check if already completed to prevent double credit addition
+    if listing.get("status") == "completed":
+        print(f"[CONFIRM COMPLETION] Task already completed, skipping credit addition")
+        return listing
     
     if listing["poster_uid"] != str(user_uid):
         raise HTTPException(

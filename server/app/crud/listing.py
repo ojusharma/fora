@@ -106,6 +106,8 @@ class ListingCRUD:
         # Apply filters
         if filters.status:
             query = query.eq("status", filters.status.value)
+        if filters.exclude_status:
+            query = query.neq("status", filters.exclude_status.value)
         if filters.poster_uid:
             query = query.eq("poster_uid", str(filters.poster_uid))
         if filters.assignee_uid:
