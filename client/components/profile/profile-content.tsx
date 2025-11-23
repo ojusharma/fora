@@ -13,6 +13,8 @@ interface UserProfile {
   latitude?: number;
   longitude?: number;
   last_updated?: string;
+  user_rating?: number;
+  no_ratings?: number;
 }
 
 interface UserStats {
@@ -49,23 +51,41 @@ interface ProfileContentProps {
 }
 
 async function fetchProfileData(userId: string, baseUrl: string) {
-  const [profileRes, statsRes, prefsRes, listingsRes] = await Promise.all([
+  const [profileRes, statsRes, prefsRes, listingsRes, completedTasksRes, pendingTasksRes] = await Promise.all([
     fetch(`${baseUrl}/api/v1/users/${userId}`, { cache: "no-store" }),
     fetch(`${baseUrl}/api/v1/users/${userId}/stats/or-create`, { cache: "no-store" }),
     fetch(`${baseUrl}/api/v1/users/${userId}/preferences/with-tags`, { cache: "no-store" }),
     fetch(`${baseUrl}/api/v1/listings?poster_uid=${userId}`, { cache: "no-store" }),
+    fetch(`${baseUrl}/api/v1/listings?assignee_uid=${userId}&status=completed`, { cache: "no-store" }),
+    fetch(`${baseUrl}/api/v1/listings/user/${userId}/with-listings?status=pending_confirmation`, { cache: "no-store" }),
   ]);
 
   const profile: UserProfile | null = profileRes.ok ? await profileRes.json() : null;
   const stats: UserStats | null = statsRes.ok ? await statsRes.json() : null;
   const preferences: UserPreference[] = prefsRes.ok ? await prefsRes.json() : [];
   const listings: Listing[] = listingsRes.ok ? await listingsRes.json() : [];
+  const completedTasks: Listing[] = completedTasksRes.ok ? await completedTasksRes.json() : [];
+  
+  // Extract listings from pending applications
+  const pendingApplicants = pendingTasksRes.ok ? await pendingTasksRes.json() : [];
+  const pendingTasks: Listing[] = pendingApplicants
+    .filter((app: any) => app.listing || app.listings)
+    .map((app: any) => {
+      const listing = app.listing || app.listings;
+      return {
+        ...listing,
+        status: "pending_confirmation"
+      };
+    });
 
-  return { profile, stats, preferences, listings };
+  // Combine pending and completed tasks
+  const allTasks = [...pendingTasks, ...completedTasks];
+
+  return { profile, stats, preferences, listings, completedTasks: allTasks };
 }
 
 export async function ProfileContent({ userId, baseUrl }: ProfileContentProps) {
-  const { profile, stats, preferences, listings } = await fetchProfileData(userId, baseUrl);
+  const { profile, stats, preferences, listings, completedTasks } = await fetchProfileData(userId, baseUrl);
   const displayName = profile?.display_name || "User";
 
   return (
@@ -115,6 +135,14 @@ export async function ProfileContent({ userId, baseUrl }: ProfileContentProps) {
                 <span className="text-sm font-medium">Date of Birth</span>
                 <span className="text-sm text-muted-foreground">
                   {new Date(profile.dob).toLocaleDateString()}
+                </span>
+              </div>
+            )}
+            {profile?.user_rating !== null && profile?.user_rating !== undefined && profile?.no_ratings && profile.no_ratings > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">User Rating</span>
+                <span className="text-sm font-semibold">
+                  {parseFloat(String(profile.user_rating)).toFixed(2)} ⭐ ({profile.no_ratings} {profile.no_ratings === 1 ? 'rating' : 'ratings'})
                 </span>
               </div>
             )}
@@ -247,6 +275,133 @@ export async function ProfileContent({ userId, baseUrl }: ProfileContentProps) {
                   <Link href="/market">View All Listings</Link>
                 </Button>
               )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Completed Tasks Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Completed Tasks</CardTitle>
+          <CardDescription>
+            Tasks you&apos;ve completed ({completedTasks.length})
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {completedTasks.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">
+                You haven&apos;t completed any tasks yet
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {completedTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="flex justify-between items-center p-3 border rounded-lg"
+                >
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        #{task.id.slice(0, 8)}
+                      </Badge>
+                      <h3 className="font-medium">{task.name}</h3>
+                    </div>
+                    <div className="flex gap-3 items-center text-sm text-muted-foreground">
+                      {task.location_address && (
+                        <div className="flex items-center gap-1">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                            <circle cx="12" cy="10" r="3" />
+                          </svg>
+                          <span className="text-xs">{task.location_address}</span>
+                        </div>
+                      )}
+                      {task.compensation && (
+                        <div className="flex items-center gap-1">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <line x1="12" x2="12" y1="2" y2="22" />
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                          </svg>
+                          <span className="text-xs font-semibold text-green-600">
+                            +{task.compensation.toFixed(2)} credits {task.status === "completed" ? "earned" : "pending"}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                          <line x1="16" x2="16" y1="2" y2="6" />
+                          <line x1="8" x2="8" y1="2" y2="6" />
+                          <line x1="3" x2="21" y1="10" y2="10" />
+                        </svg>
+                        <span className="text-xs">
+                          {new Date(task.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {task.status !== "completed" && (
+                      <div className="flex items-center gap-1 text-yellow-600" title="Poster must confirm completion">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" x2="12" y1="8" y2="12" />
+                          <line x1="12" x2="12.01" y1="16" y2="16" />
+                        </svg>
+                      </div>
+                    )}
+                    <Badge 
+                      variant="default" 
+                      className={task.status === "completed" ? "bg-green-600" : "bg-yellow-600"}
+                    >
+                      {task.status === "completed" ? "Completed" : "Pending Confirmation"}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

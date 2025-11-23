@@ -42,7 +42,6 @@ CREATE TABLE user_profiles (
   -- no PostGIS
   latitude DOUBLE PRECISION,
   longitude DOUBLE PRECISION,
-  
   user_rating NUMERIC(3, 2),
   no_ratings INTEGER NOT NULL DEFAULT 0
 );

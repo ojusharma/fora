@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { MessageSquare, CheckCircle, Star } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 interface Task {
@@ -32,6 +33,7 @@ interface Task {
 }
 
 export function TasksInProgress() {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -138,7 +140,7 @@ export function TasksInProgress() {
 
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
       
-      // Submit rating to backend if rating is greater than 0
+      // Submit rating to backend 
       if (rating > 0) {
         const ratingResponse = await fetch(
           `${baseUrl}/api/v1/ratings/poster`,
@@ -180,6 +182,9 @@ export function TasksInProgress() {
             ? { ...t, status: "pending_confirmation" }
             : t
         ));
+        
+        // Navigate to profile page
+        router.push("/profile");
       }
     } catch (err) {
       console.error("Failed to update status:", err);
