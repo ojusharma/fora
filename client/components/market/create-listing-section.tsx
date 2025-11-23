@@ -245,12 +245,9 @@ export function CreateListingSection({
           seller: l.poster_uid && nameByUid[l.poster_uid] ? nameByUid[l.poster_uid] : l.seller,
         }));
 
-        console.log('Enriched listings sample:', updatedMarket[0]);
 
-        // also populate myListings for listings posted by current user
         const mine = updatedMarket.filter((l) => currentUid && l.poster_uid === currentUid) as Listing[];
 
-        // marketplace should NOT include listings posted by the signed-in user
         const marketForViewer = updatedMarket.filter((l) => !(currentUid && l.poster_uid === currentUid));
 
         setMarketListings(marketForViewer);
@@ -304,10 +301,15 @@ export function CreateListingSection({
         );
         const data = await response.json();
 
+        console.log('Geocoding response:', data);
+
         if (data.status === "OK" && data.results.length > 0) {
           const loc = data.results[0].geometry.location;
-          setLocationCenter({ lat: loc.lat, lng: loc.lng });
+          const center = { lat: loc.lat, lng: loc.lng };
+          console.log('Setting locationCenter to:', center);
+          setLocationCenter(center);
         } else {
+          console.log('Geocoding failed:', data.status);
           setLocationCenter(null);
         }
       } catch (error) {
@@ -652,16 +654,6 @@ export function CreateListingSection({
     }
 
     return true;
-  });
-
-  console.log('Filter Debug:', {
-    totalListings: marketListings.length,
-    filteredListings: filteredMarketListings.length,
-    nameFilter,
-    locationFilter,
-    locationCenter,
-    selectedFilterTags,
-    sampleListing: marketListings[0]
   });
 
   const clearFilters = () => {
