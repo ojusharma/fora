@@ -248,7 +248,7 @@ async function handleIgnore(listingId: string | number) {
     id: l.id,                     // the actual UUID
     title: l.name,
     description: l.description,
-    reward: `${l.currency} ${l.compensation ?? ""}`,
+    reward: `${l.compensation ?? ""}`,
     location: l.location_address,
     postedBy: l.poster_uid ? posterNames[l.poster_uid] : "Unknown",
     coverImage: l.images?.[0] ?? "/placeholder.svg",

@@ -26,10 +26,23 @@ export function useRealtimeChat({ roomName, username }: UseRealtimeChatProps) {
   const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
+    // Clear previous messages when switching rooms so we only show messages for the
+    // currently selected room.
+    setMessages([])
+
     const newChannel = supabase.channel(roomName)
 
     newChannel
       .on('broadcast', { event: EVENT_MESSAGE_TYPE }, (payload) => {
+        try {
+          // log incoming broadcast for debugging persistence issues
+          // payload.payload should be the ChatMessage sent by the sender
+          // eslint-disable-next-line no-console
+          console.debug('[useRealtimeChat] received broadcast', roomName, payload.payload)
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('[useRealtimeChat] failed to log broadcast', err)
+        }
         setMessages((current) => [...current, payload.payload as ChatMessage])
       })
       .subscribe(async (status) => {
@@ -43,6 +56,8 @@ export function useRealtimeChat({ roomName, username }: UseRealtimeChatProps) {
     setChannel(newChannel)
 
     return () => {
+      // mark disconnected and remove the channel
+      setIsConnected(false)
       supabase.removeChannel(newChannel)
     }
   }, [roomName, username, supabase])

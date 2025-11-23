@@ -61,3 +61,6 @@ __all__ = [
     "UserCreditsUpdate",
     "UserLocationUpdate",
 ]
+
+from .notification import NotificationBase, NotificationCreate, NotificationOut
+

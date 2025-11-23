@@ -1,4 +1,5 @@
 import { AuthButton } from "@/components/auth-button";
+import { NotificationBell } from "@/components/notification-bell";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -19,9 +20,13 @@ export default function ProtectedLayout({
                <Link href={"/map"}>map</Link>
                <Link href={"/chats"}>my chats</Link>
             </div>
-            <Suspense>
-              <AuthButton />
-            </Suspense>
+            <div className="flex items-center gap-4">
+  <Suspense>
+    <NotificationBell />
+  </Suspense>
+
+  <AuthButton />
+</div>
           </div>
         </nav>
         <div className="flex-1 flex flex-col gap-20 max-w-5xl p-5">

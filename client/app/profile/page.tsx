@@ -6,6 +6,7 @@ import { AuthButton } from "@/components/auth-button";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { ProfileContent } from "@/components/profile/profile-content";
 import { ProfileSkeleton } from "@/components/profile/profile-skeleton";
+import { NotificationBell } from "@/components/notification-bell";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -29,9 +30,13 @@ export default async function ProfilePage() {
               <Link href={"/map"}>map</Link>
               <Link href={"/chats"}>chats</Link>
             </div>
-            <Suspense>
-              <AuthButton />
-            </Suspense>
+            <div className="flex items-center gap-4">
+  <Suspense>
+    <NotificationBell />
+  </Suspense>
+
+  <AuthButton />
+</div>
           </div>
         </nav>
 

@@ -5,6 +5,8 @@ import { HomeRecommendations } from "@/components/home-recommendations";
 import { TasksInProgress } from "@/components/tasks-in-progress";
 import Link from "next/link";
 import { Suspense } from "react";
+import { NotificationBell } from "@/components/notification-bell";
+
 
 export default async function Home() {
   const supabase = await createClient();
@@ -27,10 +29,15 @@ export default async function Home() {
                   🔧 ML Admin
                 </Link>
               )}
+              <Link href={"/chats"}>my chats</Link>
             </div>
-            <Suspense>
-              <AuthButton />
-            </Suspense>
+            <div className="flex items-center gap-4">
+  <Suspense>
+    <NotificationBell />
+  </Suspense>
+
+  <AuthButton />
+</div>
           </div>
         </nav>
         <div className="flex-1 flex flex-col gap-12 max-w-6xl w-full p-5">

@@ -17,6 +17,9 @@ from app.schemas.listing_applicants import (
     ApplicantFilters,
     ApplicantStatus,
 )
+from app.crud.notification import NotificationCRUD
+from app.schemas.notification import NotificationCreate
+from app.crud.listing import ListingCRUD
 from supabase import Client
 
 router = APIRouter()
@@ -44,6 +47,7 @@ async def apply_to_listing(
     applicant_uid: UUID,
     message: Optional[str] = None,
     crud: ListingApplicantsCRUD = Depends(get_listing_applicants_crud),
+    supabase: Client = Depends(get_supabase_client),
 ):
     """
     Apply to a listing.
@@ -66,6 +70,18 @@ async def apply_to_listing(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to create application",
             )
+        listing = await ListingCRUD(supabase).get_listing(listing_id)
+        notif_crud = NotificationCRUD(supabase)
+        await NotificationCRUD(supabase).create_notification(
+            NotificationCreate(
+                user_uid=listing["poster_uid"],
+                title="New application received",
+                body=f"Someone applied to your listing '{listing['name']}'",
+                metadata={"redirect_url": f"/market/listing/{listing_id}"}
+            )
+        )
+
+
         return result
     except Exception as e:
         # Handle database trigger errors (e.g., poster applying to own listing)
