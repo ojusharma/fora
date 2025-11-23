@@ -13,9 +13,9 @@ export function AdminLink() {
   return (
     <Link
       href="/admin"
-      className="text-xs px-2 py-1 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded font-semibold"
+      className="font-semibold"
     >
-      Admin
+      admin
     </Link>
   );
 }

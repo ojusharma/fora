@@ -23,8 +23,10 @@ export default function Home() {
               <Link href={"/"}>fora</Link>
               <Link href={"/market"}>marketplace</Link>
               <Link href={"/map"}>map</Link>
-              <AdminLink />
               <Link href={"/chats"}>my chats</Link>
+              <Suspense>
+                <AdminLink />
+              </Suspense>
             </div>
             <div className="flex items-center gap-4">
   <Suspense>
