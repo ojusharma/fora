@@ -62,9 +62,9 @@ Inspired by **Fiverr's freelance marketplace** and **Tinder's swipe interface**,
 - **UBC Email Verification** - exclusive access for UBC Okanagan students, faculty, and staff
 - **Campus Credits Economy** - earn credits by completing tasks, spend on real campus rewards
 - **Rewards Marketplace** - redeem credits at UBC Okanagan locations, such as:
-  - ☕ Free coffee from Comma
-  - 📚 Discounts at the bookstore
-  - 🎯 Special perks at local partner businesses
+  - Free coffee from Comma
+  - Discounts at the bookstore
+  - Special perks at local partner businesses
 - **User Profiles** - track your stats, ratings, and activity
 - **Interactive Maps** - Google Maps integration for campus location-based discovery
 - **Real-time Notifications** - instant updates for all important events
