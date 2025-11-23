@@ -100,7 +100,7 @@ export default function MapPage() {
     async function fetchTags() {
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-        const response = await fetch(`${baseUrl}/api/v1/tags`);
+        const response = await fetch(`${baseUrl}/api/v1/tags/`);
         if (response.ok) {
           const tags = await response.json();
           setAvailableTags(tags);
@@ -129,7 +129,7 @@ export default function MapPage() {
         }
 
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-        const response = await fetch(`${baseUrl}/api/v1/listings`, { cache: "no-store" });
+        const response = await fetch(`${baseUrl}/api/v1/listings/`, { cache: "no-store" });
         const data = await response.json();
 
         console.log('Fetched listings:', data.length);

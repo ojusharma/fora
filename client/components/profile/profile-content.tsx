@@ -55,9 +55,9 @@ async function fetchProfileData(userId: string, baseUrl: string) {
     fetch(`${baseUrl}/api/v1/users/${userId}`, { cache: "no-store" }),
     fetch(`${baseUrl}/api/v1/users/${userId}/stats/or-create`, { cache: "no-store" }),
     fetch(`${baseUrl}/api/v1/users/${userId}/preferences/with-tags`, { cache: "no-store" }),
-    fetch(`${baseUrl}/api/v1/listings?poster_uid=${userId}`, { cache: "no-store" }),
-    fetch(`${baseUrl}/api/v1/listings?assignee_uid=${userId}&status=completed`, { cache: "no-store" }),
-    fetch(`${baseUrl}/api/v1/listings?assignee_uid=${userId}&status=pending_confirmation`, { cache: "no-store" }),
+    fetch(`${baseUrl}/api/v1/listings/?poster_uid=${userId}`, { cache: "no-store" }),
+    fetch(`${baseUrl}/api/v1/listings/?assignee_uid=${userId}&status=completed`, { cache: "no-store" }),
+    fetch(`${baseUrl}/api/v1/listings/?assignee_uid=${userId}&status=pending_confirmation`, { cache: "no-store" }),
   ]);
 
   const profile: UserProfile | null = profileRes.ok ? await profileRes.json() : null;

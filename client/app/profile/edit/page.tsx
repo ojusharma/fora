@@ -21,7 +21,7 @@ interface UserProfile {
   last_updated?: string;
 }
 
-export default async function EditProfilePage() {
+async function EditProfileContent() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
 
@@ -46,6 +46,34 @@ export default async function EditProfilePage() {
   }
 
   return (
+    <div className="flex-1 flex flex-col gap-8 max-w-2xl w-full p-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Edit Profile</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Update your profile information
+          </p>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Profile Information</CardTitle>
+          <CardDescription>
+            Update your personal information and contact details
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <EditProfileForm profile={profile} userId={userId} />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export default function EditProfilePage() {
+
+  return (
     <main className="min-h-screen flex flex-col items-center">
       <div className="flex-1 w-full flex flex-col gap-20 items-center">
         <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16">
@@ -67,28 +95,16 @@ export default async function EditProfilePage() {
           </div>
         </nav>
 
-        <div className="flex-1 flex flex-col gap-8 max-w-2xl w-full p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Edit Profile</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Update your profile information
-              </p>
+        <Suspense fallback={
+          <div className="flex-1 flex flex-col gap-8 max-w-2xl w-full p-5">
+            <div className="animate-pulse space-y-4">
+              <div className="h-10 bg-muted rounded w-1/3"></div>
+              <div className="h-64 bg-muted rounded"></div>
             </div>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>
-                Update your personal information and contact details
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <EditProfileForm profile={profile} userId={userId} />
-            </CardContent>
-          </Card>
-        </div>
+        }>
+          <EditProfileContent />
+        </Suspense>
 
         <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs gap-8 py-16">
           <p>

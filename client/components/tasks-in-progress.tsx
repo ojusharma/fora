@@ -59,8 +59,8 @@ export function TasksInProgress() {
 
         // Fetch listings where user is assignee with status "in_progress" and "pending_confirmation"
         const [inProgressRes, pendingRes] = await Promise.all([
-          fetch(`${baseUrl}/api/v1/listings?assignee_uid=${uid}&status=in_progress`, { cache: "no-store" }),
-          fetch(`${baseUrl}/api/v1/listings?assignee_uid=${uid}&status=pending_confirmation`, { cache: "no-store" })
+          fetch(`${baseUrl}/api/v1/listings/?assignee_uid=${uid}&status=in_progress`, { cache: "no-store" }),
+          fetch(`${baseUrl}/api/v1/listings/?assignee_uid=${uid}&status=pending_confirmation`, { cache: "no-store" })
         ]);
 
         const inProgressListings = inProgressRes.ok ? await inProgressRes.json() : [];

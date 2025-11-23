@@ -121,8 +121,8 @@ export function usePersonalizedFeed(options: UsePersonalizedFeedOptions = {}) {
 
       try {
         const url = `${baseUrl}/api/v1/feed/interactions/${encodeURIComponent(
-          listingId
-        )}?user_uid=${encodeURIComponent(userId)}`;
+          listingId,
+        )}/?user_uid=${encodeURIComponent(userId)}`;
 
         const response = await fetch(url, {
           method: "POST",
@@ -245,7 +245,7 @@ export function useTrendingListings(limit = 20, hours = 24) {
       setError(null);
 
       try {
-        const url = `${baseUrl}/api/v1/feed/trending?limit=${limit}&hours=${hours}`;
+        const url = `${baseUrl}/api/v1/feed/trending/?limit=${limit}&hours=${hours}`;
         const response = await fetch(url);
 
         if (!response.ok) {
