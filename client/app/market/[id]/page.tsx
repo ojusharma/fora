@@ -107,18 +107,43 @@ function MarketDetailContent() {
               const uids = Array.from(new Set(apps.map((a: any) => a.applicant_uid).filter(Boolean)));
               const profilePromises = uids.map((uid) => fetch(`${baseUrl}/api/v1/users/${encodeURIComponent(uid)}`, { cache: "no-store" }).then(async (r) => (r.ok ? r.json() : null)));
               const profiles = await Promise.all(profilePromises);
-              const nameByUid: Record<string, string> = {};
-              profiles.forEach((p) => {
-                if (!p) return;
-                const uidVal = p.uid ?? p.id ?? null;
-                if (!uidVal) return;
-                nameByUid[String(uidVal)] = p.display_name ?? p.full_name ?? p.phone ?? String(uidVal).slice(0, 8);
-              });
+              const profileByUid: Record<
+  string,
+  { name: string; rating?: number; reviews?: number }
+> = {};
 
-              setApplicants(apps.map((a: any) => ({
-                ...a,
-                display_name: nameByUid[a.applicant_uid] ?? String(a.applicant_uid).slice(0, 8),
-              })));
+profiles.forEach((p) => {
+  if (!p) return;
+  const uidVal = p.uid ?? p.id;
+  if (!uidVal) return;
+
+  profileByUid[uidVal] = {
+    name:
+      p.display_name ??
+      p.full_name ??
+      p.phone ??
+      String(uidVal).slice(0, 8),
+
+    rating:
+      typeof p.user_rating === "number" ? p.user_rating : undefined,
+
+    reviews:
+      typeof p.review_count === "number" ? p.review_count : undefined,
+  };
+});
+
+              setApplicants(
+  apps.map((a: any) => {
+    const profile = profileByUid[a.applicant_uid];
+    return {
+      ...a,
+      display_name: profile?.name ?? String(a.applicant_uid).slice(0, 8),
+      user_rating: profile?.rating,
+      user_reviews: profile?.reviews,
+    };
+  })
+);
+
             }
           }
         } else if (uid) {

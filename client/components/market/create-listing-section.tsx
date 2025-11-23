@@ -32,7 +32,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { Wand2 } from "lucide-react";
+import { Star, Wand2 } from "lucide-react";
 
 // Helper function to calculate distance between two coordinates (Haversine formula)
 function calculateDistance(
@@ -230,21 +230,41 @@ export function CreateListingSection({
         const profiles = await Promise.all(profilePromises);
         if (!mounted) return;
 
-        const nameByUid: Record<string, string> = {};
-        profiles.forEach((p) => {
-          if (!p) return;
-          const uid = p.uid ?? p.id ?? null;
-          if (!uid) return;
-          // prefer a display field if present, fall back to phone or short uid
-          const display = p.display_name ?? p.full_name ?? p.phone ?? String(uid).slice(0, 8);
-          nameByUid[String(uid)] = display;
-        });
+        const detailsByUid: Record<
+  string,
+  { name: string; rating?: number; reviews?: number }
+> = {};
+
+profiles.forEach((p) => {
+  if (!p) return;
+  const uid = p.uid ?? p.id;
+  if (!uid) return;
+
+  detailsByUid[uid] = {
+    name:
+      p.display_name ??
+      p.full_name ??
+      p.phone ??
+      String(uid).slice(0, 8),
+
+    rating: typeof p.user_rating === "number" ? p.user_rating : undefined,
+    reviews: typeof p.review_count === "number" ? p.review_count : undefined,
+  };
+});
+
 
         // update market listings and hide current user's listings from the marketplace
         const updatedMarket = listings.map((l) => ({
-          ...l,
-          seller: l.poster_uid && nameByUid[l.poster_uid] ? nameByUid[l.poster_uid] : l.seller,
-        }));
+  ...l,
+  seller:
+    l.poster_uid && detailsByUid[l.poster_uid]
+      ? detailsByUid[l.poster_uid].name
+      : l.seller,
+
+  rating: l.poster_uid ? detailsByUid[l.poster_uid]?.rating : undefined,
+  reviewsCount: l.poster_uid ? detailsByUid[l.poster_uid]?.reviews : undefined,
+}));
+
 
 
         const mine = updatedMarket.filter((l) => currentUid && l.poster_uid === currentUid) as Listing[];
@@ -1160,19 +1180,14 @@ function ListingCard({ listing }: { listing: Listing }) {
           )}
         </CardContent>
         <CardFooter className="flex items-center justify-between px-4 pb-4 pt-0 text-xs">
-          {listing.rating ? (
-            <span className="flex items-center gap-1 text-foreground">
-              <span>★</span>
-              <span>
-                {listing.rating.toFixed(1)}
-                {listing.reviewsCount
-                  ? ` (${listing.reviewsCount.toLocaleString()})`
-                  : ""}
-              </span>
-            </span>
-          ) : (
-            <span className="text-muted-foreground">New</span>
-          )}
+          {typeof listing.rating === "number" ? (
+  <span className="flex items-center gap-1 text-foreground">
+    <Star className="h-4 w-4 fill-current text-yellow-500" />
+    <span className="font-medium">{listing.rating.toFixed(1)}</span>
+  </span>
+) : (
+  <span className="text-muted-foreground">New</span>
+)}
           {listing.compensation && (
             <span className="text-sm font-semibold">
               {Number(listing.compensation).toLocaleString()} Credits
