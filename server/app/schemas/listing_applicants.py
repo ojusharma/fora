@@ -15,6 +15,7 @@ class ApplicantStatus(str, Enum):
     SHORTLISTED = "shortlisted"
     REJECTED = "rejected"
     WITHDRAWN = "withdrawn"
+    PENDING_CONFIRMATION = "pending_confirmation"
 
 
 # ==================== BASE SCHEMAS ====================

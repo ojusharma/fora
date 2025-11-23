@@ -9,7 +9,8 @@ CREATE TYPE applicant_status AS ENUM (
   'applied',
   'shortlisted',
   'rejected',
-  'withdrawn'
+  'withdrawn',
+  'pending_confirmation'
 );
 
 CREATE TYPE user_role AS ENUM (
@@ -41,7 +42,9 @@ CREATE TABLE user_profiles (
   -- no PostGIS
   latitude DOUBLE PRECISION,
   longitude DOUBLE PRECISION,
-  user_rating NUMERIC(3, 2)
+  
+  user_rating NUMERIC(3, 2),
+  no_ratings INTEGER NOT NULL DEFAULT 0
 );
 
 
