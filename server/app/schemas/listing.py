@@ -17,14 +17,6 @@ class ListingStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class ApplicantStatus(str, Enum):
-    """Applicant status enum."""
-    APPLIED = "applied"
-    SHORTLISTED = "shortlisted"
-    REJECTED = "rejected"
-    WITHDRAWN = "withdrawn"
-
-
 # ==================== BASE SCHEMAS ====================
 
 class ListingBase(BaseModel):
@@ -71,30 +63,6 @@ class ListingResponse(ListingBase):
     updated_at: datetime
     poster_rating: Optional[float] = None
     assignee_rating: Optional[float] = None
-
-    class Config:
-        from_attributes = True
-
-
-# ==================== APPLICANT SCHEMAS ====================
-
-class ApplicantCreate(BaseModel):
-    """Schema for applying to a listing."""
-    message: Optional[str] = Field(None, max_length=1000)
-
-
-class ApplicantUpdate(BaseModel):
-    """Schema for updating applicant status."""
-    status: ApplicantStatus
-
-
-class ApplicantResponse(BaseModel):
-    """Schema for applicant response."""
-    listing_id: UUID
-    applicant_uid: UUID
-    applied_at: datetime
-    status: ApplicantStatus
-    message: Optional[str] = None
 
     class Config:
         from_attributes = True

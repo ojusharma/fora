@@ -34,41 +34,43 @@ def get_listing_applicants_crud(
 # ==================== APPLICATION ENDPOINTS ====================
 
 @router.post(
-    "/",
+    "/{listing_id}/applicants/{applicant_uid}/apply",
     response_model=ListingApplicantResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Apply to a listing",
 )
-async def create_application(
-    application: ListingApplicantCreate,
+async def apply_to_listing(
+    listing_id: UUID,
+    applicant_uid: UUID,
+    message: Optional[str] = None,
     crud: ListingApplicantsCRUD = Depends(get_listing_applicants_crud),
 ):
     """
     Apply to a listing.
     
     Note: The poster cannot apply to their own listing (prevented by database trigger).
+    TODO: Add authentication to get current user ID instead of accepting it in request.
     """
-    result = await crud.create_application(application)
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to create application. You may have already applied or the listing poster cannot apply to their own listing.",
-        )
-    return result
+    # TODO: Get applicant_uid from authentication context
+    # For now, this endpoint needs to be updated when auth is implemented
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="This endpoint requires authentication to be implemented first",
+    )
 
 
 @router.get(
-    "/{listing_id}/{applicant_id}",
+    "/{listing_id}/applicants/{applicant_uid}",
     response_model=ListingApplicantResponse,
     summary="Get a specific application",
 )
 async def get_application(
     listing_id: UUID,
-    applicant_id: UUID,
+    applicant_uid: UUID,
     crud: ListingApplicantsCRUD = Depends(get_listing_applicants_crud),
 ):
-    """Get a specific application by listing ID and applicant ID."""
-    result = await crud.get_application(listing_id, applicant_id)
+    """Get a specific application by listing ID and applicant UID."""
+    result = await crud.get_application(listing_id, applicant_uid)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -78,17 +80,17 @@ async def get_application(
 
 
 @router.get(
-    "/{listing_id}/{applicant_id}/details",
+    "/{listing_id}/applicants/{applicant_uid}/details",
     response_model=dict,
     summary="Get application with details",
 )
 async def get_application_with_details(
     listing_id: UUID,
-    applicant_id: UUID,
+    applicant_uid: UUID,
     crud: ListingApplicantsCRUD = Depends(get_listing_applicants_crud),
 ):
     """Get application with listing and user profile details."""
-    result = await crud.get_application_with_details(listing_id, applicant_id)
+    result = await crud.get_application_with_details(listing_id, applicant_uid)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -98,18 +100,18 @@ async def get_application_with_details(
 
 
 @router.patch(
-    "/{listing_id}/{applicant_id}",
+    "/{listing_id}/applicants/{applicant_uid}",
     response_model=ListingApplicantResponse,
     summary="Update an application",
 )
 async def update_application(
     listing_id: UUID,
-    applicant_id: UUID,
+    applicant_uid: UUID,
     update_data: ListingApplicantUpdate,
     crud: ListingApplicantsCRUD = Depends(get_listing_applicants_crud),
 ):
     """Update an application (e.g., change status or message)."""
-    result = await crud.update_application(listing_id, applicant_id, update_data)
+    result = await crud.update_application(listing_id, applicant_uid, update_data)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -118,27 +120,8 @@ async def update_application(
     return result
 
 
-@router.delete(
-    "/{listing_id}/{applicant_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete an application",
-)
-async def delete_application(
-    listing_id: UUID,
-    applicant_id: UUID,
-    crud: ListingApplicantsCRUD = Depends(get_listing_applicants_crud),
-):
-    """Delete (withdraw) an application."""
-    success = await crud.delete_application(listing_id, applicant_id)
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Application not found",
-        )
-
-
 @router.get(
-    "/listing/{listing_id}",
+    "/{listing_id}/applicants",
     response_model=List[ListingApplicantResponse],
     summary="Get all applicants for a listing",
 )
@@ -153,7 +136,7 @@ async def get_listing_applicants(
 
 
 @router.get(
-    "/listing/{listing_id}/details",
+    "/{listing_id}/applicants/details",
     response_model=List[dict],
     summary="Get applicants with user details",
 )
@@ -198,7 +181,7 @@ async def get_user_applications_with_listings(
 
 
 @router.get(
-    "/listing/{listing_id}/count",
+    "/{listing_id}/applicants/count",
     response_model=int,
     summary="Count applicants for a listing",
 )
@@ -228,53 +211,32 @@ async def count_user_applications(
 
 
 @router.get(
-    "/check/{listing_id}/{user_id}",
+    "/{listing_id}/applicants/check/{user_uid}",
     response_model=bool,
     summary="Check if user has applied",
 )
 async def has_applied(
     listing_id: UUID,
-    user_id: UUID,
+    user_uid: UUID,
     crud: ListingApplicantsCRUD = Depends(get_listing_applicants_crud),
 ):
     """Check if a user has applied to a specific listing."""
-    result = await crud.has_applied(listing_id, user_id)
-    return result
-
-
-@router.patch(
-    "/{listing_id}/{applicant_id}/status",
-    response_model=ListingApplicantResponse,
-    summary="Update application status",
-)
-async def update_status(
-    listing_id: UUID,
-    applicant_id: UUID,
-    status: ApplicantStatus,
-    crud: ListingApplicantsCRUD = Depends(get_listing_applicants_crud),
-):
-    """Update the status of an application."""
-    result = await crud.update_status(listing_id, applicant_id, status)
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Application not found",
-        )
+    result = await crud.has_applied(listing_id, user_uid)
     return result
 
 
 @router.post(
-    "/{listing_id}/{applicant_id}/withdraw",
+    "/{listing_id}/applicants/{applicant_uid}/withdraw",
     response_model=ListingApplicantResponse,
     summary="Withdraw an application",
 )
 async def withdraw_application(
     listing_id: UUID,
-    applicant_id: UUID,
+    applicant_uid: UUID,
     crud: ListingApplicantsCRUD = Depends(get_listing_applicants_crud),
 ):
     """Withdraw an application by updating status to withdrawn."""
-    result = await crud.withdraw_application(listing_id, applicant_id)
+    result = await crud.withdraw_application(listing_id, applicant_uid)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -284,17 +246,17 @@ async def withdraw_application(
 
 
 @router.post(
-    "/{listing_id}/{applicant_id}/shortlist",
+    "/{listing_id}/applicants/{applicant_uid}/shortlist",
     response_model=ListingApplicantResponse,
     summary="Shortlist an applicant",
 )
 async def shortlist_applicant(
     listing_id: UUID,
-    applicant_id: UUID,
+    applicant_uid: UUID,
     crud: ListingApplicantsCRUD = Depends(get_listing_applicants_crud),
 ):
     """Shortlist an applicant for a listing."""
-    result = await crud.shortlist_applicant(listing_id, applicant_id)
+    result = await crud.shortlist_applicant(listing_id, applicant_uid)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -304,17 +266,17 @@ async def shortlist_applicant(
 
 
 @router.post(
-    "/{listing_id}/{applicant_id}/reject",
+    "/{listing_id}/applicants/{applicant_uid}/reject",
     response_model=ListingApplicantResponse,
     summary="Reject an applicant",
 )
 async def reject_applicant(
     listing_id: UUID,
-    applicant_id: UUID,
+    applicant_uid: UUID,
     crud: ListingApplicantsCRUD = Depends(get_listing_applicants_crud),
 ):
     """Reject an applicant for a listing."""
-    result = await crud.reject_applicant(listing_id, applicant_id)
+    result = await crud.reject_applicant(listing_id, applicant_uid)
     if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

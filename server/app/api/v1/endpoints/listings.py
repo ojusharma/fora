@@ -14,9 +14,6 @@ from app.schemas.listing import (
     ListingResponse,
     ListingFilters,
     ListingStatus,
-    ApplicantCreate,
-    ApplicantResponse,
-    ApplicantUpdate,
 )
 from supabase import Client
 
@@ -159,77 +156,3 @@ async def delete_listing(
             detail="Listing not found or unauthorized",
         )
     return None
-
-
-# ==================== APPLICANT ENDPOINTS ====================
-
-@router.post(
-    "/{listing_id}/apply",
-    response_model=ApplicantResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Apply to a listing",
-)
-async def apply_to_listing(
-    listing_id: UUID,
-    application: ApplicantCreate,
-    user_uid: UUID = Depends(get_current_user_uid),
-    crud: ListingCRUD = Depends(get_listing_crud),
-):
-    """Apply to a listing."""
-    result = await crud.apply_to_listing(listing_id, user_uid, application)
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot apply to this listing (not open or already applied)",
-        )
-    return result
-
-
-@router.get(
-    "/{listing_id}/applicants",
-    response_model=List[ApplicantResponse],
-    summary="Get all applicants for a listing",
-)
-async def get_listing_applicants(
-    listing_id: UUID,
-    crud: ListingCRUD = Depends(get_listing_crud),
-):
-    """Get all applicants for a listing."""
-    return await crud.get_listing_applicants(listing_id)
-
-
-@router.patch(
-    "/{listing_id}/applicants/{applicant_uid}",
-    response_model=ApplicantResponse,
-    summary="Update applicant status",
-)
-async def update_applicant_status(
-    listing_id: UUID,
-    applicant_uid: UUID,
-    status_update: ApplicantUpdate,
-    user_uid: UUID = Depends(get_current_user_uid),
-    crud: ListingCRUD = Depends(get_listing_crud),
-):
-    """Update applicant status. Only the poster can update."""
-    result = await crud.update_applicant_status(
-        listing_id, applicant_uid, status_update, user_uid
-    )
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Application not found or unauthorized",
-        )
-    return result
-
-
-@router.get(
-    "/users/{user_uid}/applications",
-    response_model=List[ApplicantResponse],
-    summary="Get all applications by a user",
-)
-async def get_user_applications(
-    user_uid: UUID,
-    crud: ListingCRUD = Depends(get_listing_crud),
-):
-    """Get all applications by a user."""
-    return await crud.get_user_applications(user_uid)

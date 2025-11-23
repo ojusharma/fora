@@ -48,7 +48,7 @@ async def create_user_stats(
 
 
 @router.get(
-    "/{user_id}",
+    "/{user_id}/stats",
     response_model=UserStatsResponse,
     summary="Get user stats by user ID",
 )
@@ -67,7 +67,7 @@ async def get_user_stats(
 
 
 @router.get(
-    "/{user_id}/or-create",
+    "/{user_id}/stats/or-create",
     response_model=UserStatsResponse,
     summary="Get user stats or create if not exists",
 )
@@ -81,7 +81,7 @@ async def get_or_create_user_stats(
 
 
 @router.patch(
-    "/{user_id}",
+    "/{user_id}/stats",
     response_model=UserStatsResponse,
     summary="Update user stats",
 )
@@ -101,7 +101,7 @@ async def update_user_stats(
 
 
 @router.delete(
-    "/{user_id}",
+    "/{user_id}/stats",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete user stats",
 )
@@ -119,7 +119,7 @@ async def delete_user_stats(
 
 
 @router.post(
-    "/{user_id}/increment/listings-posted",
+    "/{user_id}/stats/increment/listings-posted",
     response_model=UserStatsResponse,
     summary="Increment listings posted count",
 )
@@ -138,7 +138,7 @@ async def increment_listings_posted(
 
 
 @router.post(
-    "/{user_id}/increment/listings-applied",
+    "/{user_id}/stats/increment/listings-applied",
     response_model=UserStatsResponse,
     summary="Increment listings applied count",
 )
@@ -157,7 +157,7 @@ async def increment_listings_applied(
 
 
 @router.post(
-    "/{user_id}/increment/listings-assigned",
+    "/{user_id}/stats/increment/listings-assigned",
     response_model=UserStatsResponse,
     summary="Increment listings assigned count",
 )
@@ -176,7 +176,7 @@ async def increment_listings_assigned(
 
 
 @router.post(
-    "/{user_id}/increment/listings-completed",
+    "/{user_id}/stats/increment/listings-completed",
     response_model=UserStatsResponse,
     summary="Increment listings completed count",
 )
@@ -195,7 +195,7 @@ async def increment_listings_completed(
 
 
 @router.patch(
-    "/{user_id}/rating",
+    "/{user_id}/stats/rating",
     response_model=UserStatsResponse,
     summary="Update average rating",
 )
