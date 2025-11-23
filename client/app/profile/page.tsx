@@ -1,13 +1,13 @@
-import { AuthButton } from "@/components/auth-button";
-import { ThemeSwitcher } from "@/components/theme-switcher";
 import { createClient } from "@/lib/supabase/server";
-import { MarketContent } from "@/components/market/market-content";
-import { MarketSkeleton } from "@/components/market/market-skeleton";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
+import { AuthButton } from "@/components/auth-button";
+import { ThemeSwitcher } from "@/components/theme-switcher";
+import { ProfileContent } from "@/components/profile/profile-content";
+import { ProfileSkeleton } from "@/components/profile/profile-skeleton";
 
-export default async function MarketPage() {
+export default async function ProfilePage() {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
 
@@ -15,8 +15,8 @@ export default async function MarketPage() {
     redirect("/auth/login");
   }
 
-  const baseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+  const userId = data.claims.sub;
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
   return (
     <main className="min-h-screen flex flex-col items-center">
@@ -27,7 +27,7 @@ export default async function MarketPage() {
               <Link href={"/"}>fora</Link>
               <Link href={"/market"}>marketplace</Link>
               <Link href={"/map"}>map</Link>
-              <Link href="/chats">chats</Link>
+              <Link href={"/chats"}>chats</Link>
             </div>
             <Suspense>
               <AuthButton />
@@ -35,8 +35,8 @@ export default async function MarketPage() {
           </div>
         </nav>
 
-        <Suspense fallback={<MarketSkeleton />}>
-          <MarketContent baseUrl={baseUrl} />
+        <Suspense fallback={<ProfileSkeleton />}>
+          <ProfileContent userId={userId} baseUrl={baseUrl} />
         </Suspense>
 
         <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs gap-8 py-16">

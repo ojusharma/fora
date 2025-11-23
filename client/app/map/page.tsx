@@ -332,6 +332,7 @@ export default function MapPage() {
             <Link href="/">fora</Link>
             <Link href="/market">marketplace</Link>
             <Link href="/map">map</Link>
+            <Link href="/chats">chats</Link>
           </div>
           <AuthButton />
         </div>

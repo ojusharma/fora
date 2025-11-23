@@ -31,7 +31,9 @@ export function AuthButton() {
 
   return user ? (
     <div className="flex items-center gap-4">
-      Hey, {user.user_metadata?.display_name}!
+      <Link href="/profile" className="font-semibold hover:underline">
+        {user.user_metadata?.display_name?.toLowerCase() || "profile"}
+      </Link>
       <LogoutButton />
     </div>
   ) : (

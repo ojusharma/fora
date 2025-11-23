@@ -1,215 +1,106 @@
 """
-CRUD operations for user_stats table.
+CRUD operations for user_stats - Computed on-the-fly from source tables.
 """
 
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from uuid import UUID
 from supabase import Client
-
-from app.schemas.user_stats import UserStatsCreate, UserStatsUpdate
+from datetime import datetime
 
 
 class UserStatsCRUD:
-    """CRUD operations for user stats."""
+    """CRUD operations for user stats - calculated from source data."""
 
     def __init__(self, supabase: Client):
         """Initialize with Supabase client."""
         self.supabase = supabase
 
-    # ==================== USER STATS OPERATIONS ====================
+    # ==================== COMPUTED STATS OPERATIONS ====================
 
-    async def create_user_stats(self, user_stats: UserStatsCreate) -> Dict[str, Any]:
+    async def get_user_stats(self, uid: UUID) -> Dict[str, Any]:
         """
-        Create user stats for a new user.
-        
-        Args:
-            user_stats: User stats data
-            
-        Returns:
-            Created user stats data
-        """
-        stats_data = user_stats.model_dump()
-        stats_data["uid"] = str(stats_data["uid"])
-        
-        # Convert Decimal to float for JSON serialization
-        if stats_data.get("avg_rating") is not None:
-            stats_data["avg_rating"] = float(stats_data["avg_rating"])
-
-        response = self.supabase.table("user_stats").insert(stats_data).execute()
-        return response.data[0] if response.data else None
-
-    async def get_user_stats(self, uid: UUID) -> Optional[Dict[str, Any]]:
-        """
-        Get user stats by user ID.
+        Calculate user stats on-the-fly from source tables.
         
         Args:
             uid: User ID
             
         Returns:
-            User stats data or None if not found
+            Computed user stats
         """
-        response = (
-            self.supabase.table("user_stats")
-            .select("*")
-            .eq("uid", str(uid))
+        user_id_str = str(uid)
+        
+        # 1. Count listings posted by this user
+        listings_posted_response = (
+            self.supabase.table("listings")
+            .select("id", count="exact")
+            .eq("poster_uid", user_id_str)
             .execute()
         )
-        return response.data[0] if response.data else None
-
-    async def update_user_stats(
-        self, uid: UUID, user_stats: UserStatsUpdate
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Update user stats.
+        num_listings_posted = listings_posted_response.count or 0
         
-        Args:
-            uid: User ID
-            user_stats: User stats update data
-            
-        Returns:
-            Updated user stats data or None if not found
-        """
-        stats_data = user_stats.model_dump(exclude_unset=True)
-        
-        # Convert Decimal to float for JSON serialization
-        if "avg_rating" in stats_data and stats_data["avg_rating"] is not None:
-            stats_data["avg_rating"] = float(stats_data["avg_rating"])
-
-        response = (
-            self.supabase.table("user_stats")
-            .update(stats_data)
-            .eq("uid", str(uid))
+        # 2. Count applications by this user
+        listings_applied_response = (
+            self.supabase.table("listing_applicants")
+            .select("listing_id", count="exact")
+            .eq("applicant_uid", user_id_str)
             .execute()
         )
-        return response.data[0] if response.data else None
-
-    async def delete_user_stats(self, uid: UUID) -> bool:
-        """
-        Delete user stats.
+        num_listings_applied = listings_applied_response.count or 0
         
-        Args:
-            uid: User ID
-            
-        Returns:
-            True if deleted, False if not found
-        """
-        response = (
-            self.supabase.table("user_stats")
-            .delete()
-            .eq("uid", str(uid))
+        # 3. Count listings assigned to this user
+        listings_assigned_response = (
+            self.supabase.table("listings")
+            .select("id", count="exact")
+            .eq("assignee_uid", user_id_str)
             .execute()
         )
-        return len(response.data) > 0 if response.data else False
-
-    async def increment_listings_posted(self, uid: UUID) -> Optional[Dict[str, Any]]:
-        """
-        Increment the number of listings posted by a user.
+        num_listings_assigned = listings_assigned_response.count or 0
         
-        Args:
-            uid: User ID
-            
-        Returns:
-            Updated user stats or None if not found
-        """
-        # Get current stats
-        current_stats = await self.get_user_stats(uid)
-        if not current_stats:
-            return None
-        
-        # Increment and update
-        new_count = current_stats.get("num_listings_posted", 0) + 1
-        return await self.update_user_stats(
-            uid, UserStatsUpdate(num_listings_posted=new_count)
+        # 4. Count completed listings where user was assignee
+        listings_completed_response = (
+            self.supabase.table("listings")
+            .select("id", count="exact")
+            .eq("assignee_uid", user_id_str)
+            .eq("status", "completed")
+            .execute()
         )
-
-    async def increment_listings_applied(self, uid: UUID) -> Optional[Dict[str, Any]]:
-        """
-        Increment the number of listings a user has applied to.
+        num_listings_completed = listings_completed_response.count or 0
         
-        Args:
-            uid: User ID
-            
-        Returns:
-            Updated user stats or None if not found
-        """
-        current_stats = await self.get_user_stats(uid)
-        if not current_stats:
-            return None
-        
-        new_count = current_stats.get("num_listings_applied", 0) + 1
-        return await self.update_user_stats(
-            uid, UserStatsUpdate(num_listings_applied=new_count)
+        # 5. Calculate average rating from listings where they were assignee
+        # Get all assignee_rating values for this user
+        ratings_response = (
+            self.supabase.table("listings")
+            .select("assignee_rating")
+            .eq("assignee_uid", user_id_str)
+            .not_.is_("assignee_rating", "null")
+            .execute()
         )
-
-    async def increment_listings_assigned(self, uid: UUID) -> Optional[Dict[str, Any]]:
-        """
-        Increment the number of listings assigned to a user.
         
-        Args:
-            uid: User ID
-            
-        Returns:
-            Updated user stats or None if not found
-        """
-        current_stats = await self.get_user_stats(uid)
-        if not current_stats:
-            return None
+        avg_rating = None
+        if ratings_response.data:
+            ratings = [float(r["assignee_rating"]) for r in ratings_response.data if r.get("assignee_rating")]
+            if ratings:
+                avg_rating = sum(ratings) / len(ratings)
         
-        new_count = current_stats.get("num_listings_assigned", 0) + 1
-        return await self.update_user_stats(
-            uid, UserStatsUpdate(num_listings_assigned=new_count)
-        )
-
-    async def increment_listings_completed(self, uid: UUID) -> Optional[Dict[str, Any]]:
-        """
-        Increment the number of listings completed by a user.
-        
-        Args:
-            uid: User ID
-            
-        Returns:
-            Updated user stats or None if not found
-        """
-        current_stats = await self.get_user_stats(uid)
-        if not current_stats:
-            return None
-        
-        new_count = current_stats.get("num_listings_completed", 0) + 1
-        return await self.update_user_stats(
-            uid, UserStatsUpdate(num_listings_completed=new_count)
-        )
-
-    async def update_avg_rating(
-        self, uid: UUID, new_rating: float
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Update the average rating for a user.
-        
-        Args:
-            uid: User ID
-            new_rating: New average rating value
-            
-        Returns:
-            Updated user stats or None if not found
-        """
-        return await self.update_user_stats(
-            uid, UserStatsUpdate(avg_rating=new_rating)
-        )
+        return {
+            "uid": user_id_str,
+            "num_listings_posted": num_listings_posted,
+            "num_listings_applied": num_listings_applied,
+            "num_listings_assigned": num_listings_assigned,
+            "num_listings_completed": num_listings_completed,
+            "avg_rating": avg_rating,
+            "updated_at": datetime.utcnow().isoformat(),
+        }
 
     async def get_or_create_user_stats(self, uid: UUID) -> Dict[str, Any]:
         """
-        Get user stats or create if they don't exist.
+        Get user stats (computed, so always "exists").
         
         Args:
             uid: User ID
             
         Returns:
-            User stats data
+            Computed user stats
         """
-        stats = await self.get_user_stats(uid)
-        if stats:
-            return stats
-        
-        # Create new stats with default values
-        new_stats = UserStatsCreate(uid=uid)
-        return await self.create_user_stats(new_stats)
+        # Since stats are computed, this is the same as get_user_stats
+        return await self.get_user_stats(uid)
