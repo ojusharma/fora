@@ -39,6 +39,12 @@ export function SignUpForm({
       setIsLoading(false);
       return;
     }
+    const requireUBCEmail = true; 
+    if (requireUBCEmail && !(email.toLowerCase().endsWith("@student.ubc.ca")||email.toLowerCase().endsWith("@ubc.ca"))) {
+      setError("Only UBC email domains are allowed");
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const { error } = await supabase.auth.signUp({
@@ -81,11 +87,11 @@ export function SignUpForm({
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">UBC Student/Faculty Email</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="m@example.com"
+                  placeholder="example@student.ubc.ca"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
