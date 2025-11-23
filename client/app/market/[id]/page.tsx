@@ -1,112 +1,143 @@
+"use client";
+
 import { AuthButton } from "@/components/auth-button";
 import { ThemeSwitcher } from "@/components/theme-switcher";
-import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { Suspense } from "react";
+import { notFound, redirect, useParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import ApplyControls from "@/components/market/apply-controls";
 import ApplicantActions from "@/components/market/applicant-actions";
 import WithdrawButton from "../../../components/market/withdraw-button";
+import { createClient } from "@/lib/supabase/client";
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 
-export default async function Page({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.getClaims();
+const mapContainerStyle = { width: "100%", height: "300px" };
 
-  if (error || !data?.claims) {
-    redirect("/auth/login");
-  }
+export default function Page() {
+  const params = useParams();
+  const id = params?.id as string;
+  
+  const [listing, setListing] = useState<any>(null);
+  const [posterDisplay, setPosterDisplay] = useState<string | null>(null);
+  const [currentUid, setCurrentUid] = useState<string | null>(null);
+  const [isPoster, setIsPoster] = useState(false);
+  const [applicants, setApplicants] = useState<any[]>([]);
+  const [myApplication, setMyApplication] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const currentUid = data?.claims?.sub ?? null;
-
-  const baseUrl =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-
-    const { id } = await params;
-
-  const res = await fetch(`${baseUrl}/api/v1/listings/${id}`, {
-    cache: "no-store",
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
   });
-  if (!res.ok) {
-    notFound();
-  }
 
-  const listing = await res.json();
+  useEffect(() => {
+    async function loadData() {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.getUser();
 
-  // Fetch poster profile to show display name
-  let posterDisplay: string | null = null;
-  try {
-    const posterUid = listing.poster_uid ?? listing.posterUid ?? listing.poster ?? null;
-    if (posterUid) {
-      const profileRes = await fetch(`${baseUrl}/api/v1/users/${encodeURIComponent(posterUid)}`, { cache: "no-store" });
-      if (profileRes.ok) {
-        const profile = await profileRes.json();
-        posterDisplay = profile.display_name ?? profile.full_name ?? profile.phone ?? String(profile.uid ?? profile.id ?? posterUid).slice(0, 8);
-      } else {
-        posterDisplay = String(posterUid).slice(0, 8);
+      if (error || !data?.user) {
+        window.location.href = "/auth/login";
+        return;
       }
-    }
-  } catch (err) {
-    posterDisplay = null;
-  }
 
-  // Determine if current user is the poster
-  const isPoster = Boolean(currentUid && (listing.poster_uid ?? listing.posterUid ?? listing.poster) && currentUid === (listing.poster_uid ?? listing.posterUid ?? listing.poster));
+      const uid = data.user.id;
+      setCurrentUid(uid);
 
-  // Fetch applicants only if I'm the poster; otherwise fetch my application status
-  let applicants: any[] = [];
-  let myApplication: any | null = null;
-  try {
-    if (isPoster) {
-      const applicantsRes = await fetch(`${baseUrl}/api/v1/listings/${id}/applicants`, { cache: "no-store" });
-      if (applicantsRes.ok) {
-        const apps = await applicantsRes.json();
-        if (Array.isArray(apps) && apps.length > 0) {
-          // collect unique applicant uids
-          const uids = Array.from(new Set(apps.map((a: any) => a.applicant_uid).filter(Boolean)));
-          const profilePromises = uids.map((uid) => fetch(`${baseUrl}/api/v1/users/${encodeURIComponent(uid)}`, { cache: "no-store" }).then(async (r) => (r.ok ? r.json() : null)));
-          const profiles = await Promise.all(profilePromises);
-          const nameByUid: Record<string, string> = {};
-          profiles.forEach((p) => {
-            if (!p) return;
-            const uid = p.uid ?? p.id ?? null;
-            if (!uid) return;
-            nameByUid[String(uid)] = p.display_name ?? p.full_name ?? p.phone ?? String(uid).slice(0, 8);
-          });
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
-          applicants = apps.map((a: any) => ({
-            ...a,
-            display_name: nameByUid[a.applicant_uid] ?? String(a.applicant_uid).slice(0, 8),
-          }));
-        }
+      const res = await fetch(`${baseUrl}/api/v1/listings/${id}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        notFound();
+        return;
       }
-    } else if (currentUid) {
-      // fetch my applications and find this listing
-      const myAppsRes = await fetch(`${baseUrl}/api/v1/listings/users/${encodeURIComponent(currentUid)}/applications`, { cache: "no-store" });
-      // Note: existing endpoint is `/api/v1/listings/users/{user_uid}/applications` per router definition
-      if (myAppsRes.ok) {
-        const myApps = await myAppsRes.json();
-        if (Array.isArray(myApps) && myApps.length > 0) {
-          const found = myApps.find((a: any) => String(a.listing_id) === String(id) || String(a.listing_id) === String(listing.id));
-          if (found) {
-            myApplication = found;
+
+      const listingData = await res.json();
+      setListing(listingData);
+
+      // Fetch poster profile
+      try {
+        const posterUid = listingData.poster_uid ?? listingData.posterUid ?? listingData.poster ?? null;
+        if (posterUid) {
+          const profileRes = await fetch(`${baseUrl}/api/v1/users/${encodeURIComponent(posterUid)}`, { cache: "no-store" });
+          if (profileRes.ok) {
+            const profile = await profileRes.json();
+            setPosterDisplay(profile.display_name ?? profile.full_name ?? profile.phone ?? String(profile.uid ?? profile.id ?? posterUid).slice(0, 8));
+          } else {
+            setPosterDisplay(String(posterUid).slice(0, 8));
           }
         }
+      } catch (err) {
+        setPosterDisplay(null);
       }
+
+      // Determine if current user is the poster
+      const isUserPoster = Boolean(uid && (listingData.poster_uid ?? listingData.posterUid ?? listingData.poster) && uid === (listingData.poster_uid ?? listingData.posterUid ?? listingData.poster));
+      setIsPoster(isUserPoster);
+
+      try {
+        if (isUserPoster) {
+          const applicantsRes = await fetch(`${baseUrl}/api/v1/listings/${id}/applicants`, { cache: "no-store" });
+          if (applicantsRes.ok) {
+            const apps = await applicantsRes.json();
+            if (Array.isArray(apps) && apps.length > 0) {
+              const uids = Array.from(new Set(apps.map((a: any) => a.applicant_uid).filter(Boolean)));
+              const profilePromises = uids.map((uid) => fetch(`${baseUrl}/api/v1/users/${encodeURIComponent(uid)}`, { cache: "no-store" }).then(async (r) => (r.ok ? r.json() : null)));
+              const profiles = await Promise.all(profilePromises);
+              const nameByUid: Record<string, string> = {};
+              profiles.forEach((p) => {
+                if (!p) return;
+                const uidVal = p.uid ?? p.id ?? null;
+                if (!uidVal) return;
+                nameByUid[String(uidVal)] = p.display_name ?? p.full_name ?? p.phone ?? String(uidVal).slice(0, 8);
+              });
+
+              setApplicants(apps.map((a: any) => ({
+                ...a,
+                display_name: nameByUid[a.applicant_uid] ?? String(a.applicant_uid).slice(0, 8),
+              })));
+            }
+          }
+        } else if (uid) {
+          const myAppsRes = await fetch(`${baseUrl}/api/v1/listings/users/${encodeURIComponent(uid)}/applications`, { cache: "no-store" });
+          if (myAppsRes.ok) {
+            const myApps = await myAppsRes.json();
+            if (Array.isArray(myApps) && myApps.length > 0) {
+              const found = myApps.find((a: any) => String(a.listing_id) === String(id) || String(a.listing_id) === String(listingData.id));
+              if (found) {
+                setMyApplication(found);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        // ignore errors
+      }
+
+      setIsLoading(false);
     }
-  } catch (err) {
-    // ignore applicant loading errors
-    applicants = [];
-    myApplication = null;
+
+    loadData();
+  }, [id]);
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <p>Loading...</p>
+      </main>
+    );
+  }
+
+  if (!listing) {
+    return null;
   }
 
   const primaryImage =
     Array.isArray(listing.images) && listing.images.length > 0
       ? listing.images[0]
       : null;
+
+  const hasLocation = listing.latitude && listing.longitude;
 
   return (
     <main className="min-h-screen flex flex-col items-center">
@@ -183,6 +214,48 @@ export default async function Page({
               </section>
             )}
 
+            {/* Map Section */}
+            {hasLocation && (
+              <section className="space-y-2">
+                <h2 className="text-sm font-semibold">Location</h2>
+                <div className="w-full rounded-lg overflow-hidden border">
+                  {!isLoaded ? (
+                    <div className="w-full h-[300px] flex items-center justify-center bg-muted">
+                      <p className="text-sm text-muted-foreground">Loading map...</p>
+                    </div>
+                  ) : (
+                    <GoogleMap
+                      mapContainerStyle={mapContainerStyle}
+                      center={{ lat: listing.latitude, lng: listing.longitude }}
+                      zoom={14}
+                      options={{
+                        streetViewControl: false,
+                        mapTypeControl: false,
+                        fullscreenControl: false,
+                      }}
+                    >
+                      <Marker
+                        position={{ lat: listing.latitude, lng: listing.longitude }}
+                        icon={{
+                          path: window.google?.maps?.SymbolPath?.CIRCLE,
+                          scale: 10,
+                          fillColor: "#3b82f6",
+                          fillOpacity: 1,
+                          strokeColor: "#ffffff",
+                          strokeWeight: 2,
+                        }}
+                      />
+                    </GoogleMap>
+                  )}
+                </div>
+                {listing.location_address && (
+                  <p className="text-xs text-muted-foreground">
+                    📍 {listing.location_address}
+                  </p>
+                )}
+              </section>
+            )}
+
             {isPoster ? (
               applicants.length > 0 ? (
                 <section className="space-y-2">
@@ -226,7 +299,7 @@ export default async function Page({
                       <div className="ml-auto">
                         <Suspense>
                           {/* WithdrawButton is client-side and will reload on success */}
-                          <WithdrawButton listingId={String(listing.id ?? id)} currentUserId={currentUid} />
+                          {currentUid && <WithdrawButton listingId={String(listing.id ?? id)} currentUserId={currentUid} />}
                         </Suspense>
                       </div>
                     </div>
