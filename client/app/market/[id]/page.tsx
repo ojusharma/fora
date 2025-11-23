@@ -206,7 +206,7 @@ export default function Page() {
               {posterDisplay && (
                 <p className="text-xs text-muted-foreground">Posted by {posterDisplay}</p>
               )}
-                {!isPoster && currentUid && !myApplication && (
+                {!isPoster && currentUid && (!myApplication || myApplication.status === 'withdrawn' || myApplication.status === 'rejected') && (
                   <div className="pt-2">
                     <ApplyControls
                       listingId={String(listing.id ?? id)}
@@ -327,7 +327,7 @@ export default function Page() {
               <section className="space-y-2">
                 <h2 className="text-sm font-semibold">Your application</h2>
                 <div>
-                  {myApplication ? (
+                  {myApplication && myApplication.status !== 'withdrawn' && myApplication.status !== 'rejected' ? (
                     <div className="flex items-center gap-3">
                       <span className="px-2 py-1 rounded-full text-xs font-medium bg-muted text-foreground">
                         {String(myApplication.status).toUpperCase()}
@@ -339,6 +339,10 @@ export default function Page() {
                           {currentUid && <WithdrawButton listingId={String(listing.id ?? id)} currentUserId={currentUid} />}
                         </Suspense>
                       </div>
+                    </div>
+                  ) : myApplication && (myApplication.status === 'withdrawn' || myApplication.status === 'rejected') ? (
+                    <div className="text-sm text-muted-foreground">
+                      You previously {myApplication.status === 'withdrawn' ? 'withdrew your application' : 'were rejected'}. You can apply again if you wish.
                     </div>
                   ) : (
                     <div className="text-sm text-muted-foreground">You have not applied to this listing.</div>
