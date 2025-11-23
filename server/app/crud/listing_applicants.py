@@ -45,13 +45,13 @@ class ListingApplicantsCRUD:
         self, application: ListingApplicantCreate
     ) -> Dict[str, Any]:
         """
-        Create a new listing application.
+        Create a new listing application or reactivate withdrawn/rejected application.
         
         Args:
             application: Application data
             
         Returns:
-            Created application data
+            Created/updated application data
             
         Raises:
             Exception if applicant is the poster (prevented by trigger)
@@ -59,8 +59,33 @@ class ListingApplicantsCRUD:
         application_data = application.model_dump()
         application_data["listing_id"] = str(application_data["listing_id"])
         application_data["applicant_uid"] = str(application_data["applicant_uid"])
+        
+        # Check if there's an existing application
+        existing = await self.get_application(
+            UUID(application_data["listing_id"]),
+            UUID(application_data["applicant_uid"])
+        )
+        
+        if existing:
+            # If withdrawn or rejected, update to "applied" status
+            if existing.get("status") in ["withdrawn", "rejected"]:
+                application_data["status"] = "applied"
+                application_data["applied_at"] = datetime.utcnow().isoformat()
+                
+                response = (
+                    self.supabase.table("listing_applicants")
+                    .update(application_data)
+                    .eq("listing_id", application_data["listing_id"])
+                    .eq("applicant_uid", application_data["applicant_uid"])
+                    .execute()
+                )
+                return response.data[0] if response.data else None
+            else:
+                # Already has active application
+                return existing
+        
+        # Create new application
         application_data["status"] = "applied"
-
         response = (
             self.supabase.table("listing_applicants")
             .insert(application_data)
@@ -326,17 +351,22 @@ class ListingApplicantsCRUD:
 
     async def has_applied(self, listing_id: UUID, applicant_uid: UUID) -> bool:
         """
-        Check if a user has applied to a listing.
+        Check if a user has an active application to a listing.
         
         Args:
             listing_id: Listing ID
             applicant_uid: User ID
             
         Returns:
-            True if applied, False otherwise
+            True if has active application (not withdrawn/rejected), False otherwise
         """
         application = await self.get_application(listing_id, applicant_uid)
-        return application is not None
+        if not application:
+            return False
+        
+        # Allow reapplying if previously withdrawn or rejected
+        status = application.get("status")
+        return status not in ["withdrawn", "rejected"]
 
     async def update_status(
         self,
