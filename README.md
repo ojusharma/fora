@@ -17,6 +17,12 @@
 
 ## Overview
 
+<img width="1036" height="210" alt="image" src="https://github.com/user-attachments/assets/377db7f3-e84c-4df4-982a-d94eff16383c" />
+
+
+---
+
+
 Fora is a **UBC Okanagan exclusive** task marketplace platform designed for students, faculty, and staff. Users must have a valid **UBC email** (@ubc.ca or @student.ubc.ca) to join. Complete tasks to earn credits, then redeem them at participating **UBC Okanagan locations** - grab a free coffee from Tim Hortons, get discounts at the bookstore, or enjoy perks at local partner businesses.
 
 Inspired by **Fiverr's freelance marketplace** and **Tinder's swipe interface**, Fora combines professional task matching with a quick, intuitive application experience that makes finding voluntary work and helping the campus community feel effortless.
